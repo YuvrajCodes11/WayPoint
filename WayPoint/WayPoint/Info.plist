@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>WayPoint uses your location to auto-detect your current city and calculate distances to itinerary stops.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>WayPoint requires camera access to scan digital boarding pass QR codes and hotel vouchers.</string>
+</dict>
+</plist>
