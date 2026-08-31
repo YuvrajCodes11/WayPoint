@@ -25,7 +25,7 @@ public struct SupabaseConfig {
         if let configKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_PUBLISHABLE_KEY") as? String, !configKey.isEmpty {
             return configKey
         }
-        return "sb_publishable_64GdTpBNAq2sXH1QTLIs4w_Ml-2EYKy"
+        return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdocXNqcHNkcHhzd3h3ZXNjamNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MDMxNzMsImV4cCI6MjEwMjE3OTE3M30.vtmqixKiCmGpVjSU6TDuDEOtM0es9WjwVXADQzhY1XY"
     }
 
     public static var url: URL {
