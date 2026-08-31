@@ -47,17 +47,10 @@ struct DayPlan: Identifiable, Codable, Hashable {
     }
 
     var formattedRemaining: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = currencyCode
-        return formatter.string(from: remainingBudget as NSDecimalNumber) ?? "\(currencyCode) \(remainingBudget)"
+        LocaleManager.formatCurrency(remainingBudget, currencyCode: currencyCode)
     }
 
     func formatCurrency(_ amount: Decimal) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = currencyCode
-        formatter.maximumFractionDigits = 0
-        return formatter.string(from: amount as NSDecimalNumber) ?? "\(currencyCode) \(amount)"
+        LocaleManager.formatCurrency(amount, currencyCode: currencyCode)
     }
 }

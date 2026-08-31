@@ -38,7 +38,6 @@ enum AppTab: Int, CaseIterable, Identifiable {
 
 struct MainTabView: View {
     @State private var selectedTab: AppTab = .dashboard
-    @State private var trip: Trip = .empty
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -47,9 +46,11 @@ struct MainTabView: View {
             SplineWebContainer(urlString: "https://my.spline.design/iridescenttorusanimation-34cvLNege0W70WxpEm6Aml6d/")
                 .id("persistent_spline_canvas")
                 .scaleEffect(1.08)
+                .padding(.bottom, -35)
                 .clipped()
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
+                .compositingGroup()
             #else
             WayPointTheme.obsidian.ignoresSafeArea()
             #endif
@@ -63,7 +64,7 @@ struct MainTabView: View {
                     .opacity(selectedTab == .dashboard ? 1 : 0)
                     .allowsHitTesting(selectedTab == .dashboard)
 
-                ItineraryMapView(trip: $trip)
+                ItineraryMapView()
                     .opacity(selectedTab == .map ? 1 : 0)
                     .allowsHitTesting(selectedTab == .map)
 

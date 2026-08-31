@@ -2,32 +2,37 @@
 //  ItineraryMapView.swift
 //  WayPoint
 //
+//  Task 4.1 / WP6: MapKit Navigation, Null Island Guard & Route Safety
+//
 
 import SwiftUI
 import MapKit
 
 struct ItineraryMapView: View {
-    @Binding var trip: Trip
+    @Environment(TripStore.self) private var tripStore
     @State private var selectedItem: ItineraryItem? = nil
     @State private var position: MapCameraPosition = .automatic
     @State private var locationService = LocationService.shared
+    @State private var directionError: String? = nil
 
     private var currentDayPlan: DayPlan {
-        trip.currentDayPlan
+        tripStore.currentDayPlan
     }
 
     private var coordinates: [CLLocationCoordinate2D] {
         currentDayPlan.items.compactMap { item in
-            if let coord = item.coordinate {
+            if let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) {
                 return CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
             }
             return nil
         }
     }
 
+    @State private var openMapsToast: String? = nil
+
     var body: some View {
         ZStack {
-            // Layer 1: Native Interactive Map View (Full screen touch receiver)
+            // Layer 1: Native Interactive Map View
             Map(position: $position, selection: $selectedItem) {
                 UserAnnotation()
 
@@ -37,15 +42,19 @@ struct ItineraryMapView: View {
                 }
 
                 ForEach(currentDayPlan.items, id: \.id) { item in
-                    if let coord = item.coordinate {
+                    if let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) {
                         Annotation(
                             item.title,
                             coordinate: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
                         ) {
                             MapMarkerPin(item: item, isSelected: selectedItem?.id == item.id)
                                 .onTapGesture {
-                                    withAnimation {
+                                    #if canImport(UIKit)
+                                    UISelectionFeedbackGenerator().selectionChanged()
+                                    #endif
+                                    withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
                                         selectedItem = item
+                                        updateCameraPosition(for: item)
                                     }
                                 }
                         }
@@ -59,37 +68,59 @@ struct ItineraryMapView: View {
                 MapUserLocationButton()
             }
 
-            // Layer 2: Top Header Overlay (Non-blocking parent container, active hit-testing on header)
+            // Layer 2: Top Header Overlay
             VStack {
                 topHeaderOverlay
-                    .padding(.top, 12)
                     .allowsHitTesting(true)
+                
+                if let mapsToast = openMapsToast {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.black)
+                        Text(mapsToast)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.black)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(WayPointTheme.cyanGlow, in: Capsule())
+                    .shadow(color: WayPointTheme.cyanGlow.opacity(0.4), radius: 10, x: 0, y: 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.top, 8)
+                }
+
                 Spacer()
             }
             .allowsHitTesting(false)
 
-            // Layer 3: Bottom Detail Overlay Card (Non-blocking parent container, active hit-testing on card)
-            if let selected = selectedItem {
-                VStack {
-                    Spacer()
-                    bottomDetailCard(item: selected)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .padding(.bottom, 95)
-                        .allowsHitTesting(true)
-                }
-                .allowsHitTesting(false)
+            // Layer 3: Synchronized Horizontal Card Deck Overlay
+            VStack {
+                Spacer()
+                horizontalCardDeck
+                    .padding(.bottom, 95)
+                    .allowsHitTesting(true)
             }
+            .allowsHitTesting(false)
         }
         .preferredColorScheme(.dark)
         .onAppear {
             if selectedItem == nil {
                 selectedItem = currentDayPlan.items.first
             }
-            updateCameraPosition()
+            updateCameraPosition(for: selectedItem)
         }
-        .onChange(of: trip.selectedDayIndex) {
+        .onChange(of: tripStore.activeTrip.selectedDayIndex) {
             selectedItem = currentDayPlan.items.first
-            updateCameraPosition()
+            updateCameraPosition(for: selectedItem)
+        }
+        .alert("Directions unavailable", isPresented: Binding(
+            get: { directionError != nil },
+            set: { if !$0 { directionError = nil } }
+        )) {
+            Button("OK", role: .cancel) { directionError = nil }
+        } message: {
+            Text(directionError ?? "")
         }
     }
 
@@ -97,7 +128,7 @@ struct ItineraryMapView: View {
 
     private var topHeaderOverlay: some View {
         VStack(spacing: 8) {
-            HStack {
+            HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("GPS RADAR & MAP")
                         .font(.caption.weight(.bold))
@@ -106,22 +137,27 @@ struct ItineraryMapView: View {
 
                     Text(currentDayPlan.title)
                         .font(.title3.weight(.bold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                         .foregroundStyle(WayPointTheme.textPrimary)
                 }
 
                 Spacer()
 
                 Menu {
-                    ForEach(Array(trip.days.enumerated()), id: \.element.id) { index, day in
+                    ForEach(Array(tripStore.activeTrip.days.enumerated()), id: \.element.id) { index, day in
                         Button("Day \(index + 1): \(day.title)") {
-                            withAnimation {
-                                trip.selectedDayIndex = index
+                            #if canImport(UIKit)
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            #endif
+                            withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+                                tripStore.selectDay(index)
                             }
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Text("Day \(trip.selectedDayIndex + 1)")
+                        Text("Day \(tripStore.activeTrip.selectedDayIndex + 1)")
                             .font(.caption.weight(.bold))
                         Image(systemName: "chevron.down")
                             .font(.caption2.weight(.bold))
@@ -130,73 +166,137 @@ struct ItineraryMapView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(WayPointTheme.accentGradient, in: Capsule())
+                    .shadow(color: WayPointTheme.cyanGlow.opacity(0.3), radius: 8, x: 0, y: 3)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 16)
+            .padding(.top, 50)
         }
     }
 
-    // MARK: - Bottom Detail Card Overlay
+    // MARK: - Synchronized Horizontal Card Deck Overlay
 
-    private func bottomDetailCard(item: ItineraryItem) -> some View {
-        GlassCardView(
-            cornerRadius: 22,
-            padding: 16,
-            glowColor: WayPointTheme.cyanGlow
+    private var horizontalCardDeck: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(currentDayPlan.items, id: \.id) { item in
+                        venueCard(item: item)
+                            .id(item.id)
+                            .onTapGesture {
+                                #if canImport(UIKit)
+                                UISelectionFeedbackGenerator().selectionChanged()
+                                #endif
+                                withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+                                    selectedItem = item
+                                    updateCameraPosition(for: item)
+                                }
+                            }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .onChange(of: selectedItem?.id) { _, newID in
+                if let targetID = newID {
+                    withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+                        proxy.scrollTo(targetID, anchor: .center)
+                    }
+                }
+            }
+        }
+    }
+
+    private func venueCard(item: ItineraryItem) -> some View {
+        let isSelected = selectedItem?.id == item.id
+        let hasValidCoord = item.coordinate != nil && LocationService.isValidCoordinate(latitude: item.coordinate!.latitude, longitude: item.coordinate!.longitude)
+
+        return GlassCardView(
+            cornerRadius: 20,
+            padding: 14,
+            glowColor: isSelected ? WayPointTheme.cyanGlow : .clear
         ) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Image(systemName: item.category.systemImage)
-                                .font(.caption.weight(.bold))
+                                .font(.caption2.weight(.bold))
                             Text(item.category.displayName.uppercased())
-                                .font(.caption.weight(.bold))
+                                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
                         }
                         .foregroundStyle(WayPointTheme.cyanGlow)
 
                         Text(item.title)
-                            .font(.headline.weight(.bold))
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundStyle(WayPointTheme.textPrimary)
+                            .lineLimit(1)
 
                         Text(item.timeRange)
-                            .font(.caption.weight(.semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(WayPointTheme.textSecondary)
                     }
 
-                    Spacer()
+                    Spacer(minLength: 8)
 
-                    Button(action: { openInAppleMaps(item: item) }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                                .font(.body.weight(.bold))
-                            Text("Directions")
-                                .font(.caption.weight(.bold))
+                    if hasValidCoord {
+                        Button(action: { openInAppleMaps(item: item) }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                Text("Directions")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(WayPointTheme.accentGradient, in: Capsule())
                         }
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(WayPointTheme.accentGradient, in: Capsule())
+                        .buttonStyle(.plain)
+                    } else {
+                        HStack(spacing: 4) {
+                            Image(systemName: "location.slash.fill")
+                                .font(.caption2)
+                            Text("Offline Stop")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundStyle(WayPointTheme.textTertiary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(WayPointTheme.obsidianElevated, in: Capsule())
+                        .overlay(Capsule().strokeBorder(WayPointTheme.glassBorder, lineWidth: 1))
                     }
                 }
 
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Image(systemName: "mappin")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(WayPointTheme.textTertiary)
                     Text(item.location)
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(WayPointTheme.textSecondary)
                         .lineLimit(1)
                 }
             }
+            .frame(width: 270)
         }
-        .padding(.horizontal, 16)
+        .scaleEffect(isSelected ? 1.02 : 0.98)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(isSelected ? WayPointTheme.cyanGlow : WayPointTheme.glassBorder, lineWidth: isSelected ? 1.5 : 1)
+        )
     }
 
-    private func updateCameraPosition() {
-        if let userLoc = locationService.currentLocation?.coordinate {
+    // MARK: - Camera & Routing Helpers
+
+    private func updateCameraPosition(for item: ItineraryItem?) {
+        if let item = item, let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) {
+            let clCoord = CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
+            let region = MKCoordinateRegion(
+                center: clCoord,
+                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+            )
+            position = .region(region)
+        } else if let userLoc = locationService.currentLocation?.coordinate {
             let region = MKCoordinateRegion(
                 center: userLoc,
                 span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
@@ -205,19 +305,39 @@ struct ItineraryMapView: View {
         } else if let firstCoord = coordinates.first {
             let region = MKCoordinateRegion(
                 center: firstCoord,
-                span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+                span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
             )
             position = .region(region)
         }
     }
 
     private func openInAppleMaps(item: ItineraryItem) {
-        guard let coord = item.coordinate else { return }
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+
+        guard let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) else {
+            directionError = "Directions are unavailable because this activity has no valid map coordinate."
+            return
+        }
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            openMapsToast = "Opening Apple Maps for \(item.title)..."
+        }
+
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation(.easeInOut(duration: 0.3)) {
+                openMapsToast = nil
+            }
+        }
+
         let clCoord = CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
-        let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: clCoord))
+        let placemark = MKPlacemark(coordinate: clCoord)
+        let mapItem = MKMapItem(placemark: placemark)
         mapItem.name = item.title
         mapItem.openInMaps(launchOptions: [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
+            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking
         ])
     }
 }
@@ -240,10 +360,6 @@ private struct MapMarkerPin: View {
                 .foregroundStyle(isSelected ? .black : WayPointTheme.cyanGlow)
         }
         .scaleEffect(isSelected ? 1.2 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        .animation(.spring(response: 0.38, dampingFraction: 0.8), value: isSelected)
     }
-}
-
-#Preview {
-    ItineraryMapView(trip: .constant(.empty))
 }

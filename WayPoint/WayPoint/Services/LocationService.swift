@@ -7,6 +7,8 @@ import Foundation
 import CoreLocation
 import SwiftUI
 
+typealias LocationManager = LocationService
+
 @MainActor
 @Observable
 final class LocationService: NSObject, CLLocationManagerDelegate {
@@ -29,11 +31,32 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
 
     func requestLocationPermission() {
         authorizationStatus = locationManager.authorizationStatus
-        if authorizationStatus == .notDetermined {
+        switch authorizationStatus {
+        case .notDetermined:
             locationManager.requestWhenInUseAuthorization()
-        } else if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+        case .authorizedWhenInUse, .authorizedAlways:
             locationManager.startUpdatingLocation()
+        case .restricted, .denied:
+            print("[LocationService] Location access restricted or denied. Using fallback location.")
+        @unknown default:
+            break
         }
+    }
+
+    /// Null Island & Range Coordinate Guard
+    static func isValidCoordinate(latitude: Double, longitude: Double) -> Bool {
+        return latitude != 0.0 && longitude != 0.0 && abs(latitude) <= 90.0 && abs(longitude) <= 180.0
+    }
+
+    /// Safely calculates distance in meters between user location and target coordinates with zero fallback on invalid inputs
+    func distanceMeters(to latitude: Double, to longitude: Double) -> Int {
+        guard Self.isValidCoordinate(latitude: latitude, longitude: longitude),
+              let userLoc = currentLocation else {
+            return 0
+        }
+        let venueLoc = CLLocation(latitude: latitude, longitude: longitude)
+        let meters = userLoc.distance(from: venueLoc)
+        return max(50, Int(meters))
     }
 
     // MARK: - CLLocationManagerDelegate
@@ -41,8 +64,15 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
             self.authorizationStatus = manager.authorizationStatus
-            if self.authorizationStatus == .authorizedWhenInUse || self.authorizationStatus == .authorizedAlways {
+            switch self.authorizationStatus {
+            case .authorizedWhenInUse, .authorizedAlways:
                 manager.startUpdatingLocation()
+            case .restricted, .denied:
+                print("[LocationService] Authorization changed to restricted/denied.")
+            case .notDetermined:
+                break
+            @unknown default:
+                break
             }
         }
     }

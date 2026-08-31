@@ -9,11 +9,14 @@ struct ItineraryDetailView: View {
     @Binding var item: ItineraryItem
     var onToggleCompletion: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ZStack {
-            WayPointTheme.obsidian
+            WayPointTheme.oledBackground
                 .ignoresSafeArea()
+                .accessibilityHidden(true)
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
@@ -31,10 +34,13 @@ struct ItineraryDetailView: View {
                         notesSection(notes: notes)
                     }
 
-                    // Cost Breakdown Card
-                    costBreakdownSection
+                    // Cost & 3% Fee Breakdown Card
+                    priceBreakdownCard
 
-                    Spacer(minLength: 20)
+                    // 1-Tap Apple Pay Checkout Button
+                    applePayBookingButton
+
+                    Spacer(minLength: 12)
 
                     // Completion Toggle CTA
                     completionToggleButton
@@ -52,30 +58,51 @@ struct ItineraryDetailView: View {
     private var headerSection: some View {
         VStack(spacing: 12) {
             Capsule()
-                .fill(WayPointTheme.glassBorder)
+                .fill(WayPointTheme.hairlineStroke)
                 .frame(width: 36, height: 5)
+                .accessibilityHidden(true)
 
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: item.category.systemImage)
                         .font(.caption.weight(.bold))
+                        .symbolRenderingMode(.hierarchical)
                     Text(item.category.displayName.uppercased())
                         .font(.caption.weight(.bold))
                         .tracking(1.2)
                 }
-                .foregroundStyle(WayPointTheme.cyanGlow)
+                .foregroundStyle(WayPointTheme.sapphireAccent)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(WayPointTheme.cyanGlow.opacity(0.15), in: Capsule())
-                .overlay(Capsule().strokeBorder(WayPointTheme.cyanGlow.opacity(0.3), lineWidth: 1))
+                .background(WayPointTheme.sapphireAccent.opacity(0.15), in: Capsule())
+                .overlay(Capsule().strokeBorder(WayPointTheme.sapphireAccent.opacity(0.3), lineWidth: 1))
+
+                if item.isPreservedReservation {
+                    HStack(spacing: 3) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .symbolRenderingMode(.hierarchical)
+                        Text("🔒 PROTECTED")
+                            .font(.system(size: 8.5, weight: .heavy, design: .monospaced))
+                    }
+                    .foregroundStyle(WayPointTheme.imperialGold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(WayPointTheme.imperialGold.opacity(0.18), in: Capsule())
+                    .overlay(Capsule().strokeBorder(WayPointTheme.imperialGold.opacity(0.5), lineWidth: 1))
+                }
 
                 Spacer()
 
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(WayPointTheme.textSecondary)
                 }
+                .accessibilityLabel("Close item details")
+                .accessibilityHint("Dismisses the itinerary item detail sheet")
+                .accessibilityAddTraits(.isButton)
             }
         }
     }
@@ -84,15 +111,15 @@ struct ItineraryDetailView: View {
 
     private var mainInfoCard: some View {
         GlassCardView(
-            cornerRadius: 20,
+            cornerRadius: 16,
             padding: 20,
-            glowColor: item.isCompleted ? WayPointTheme.violetGlow : WayPointTheme.cyanGlow
+            glowColor: item.isCompleted ? WayPointTheme.emeraldRecovery : WayPointTheme.sapphireAccent
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(item.timeRange)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(WayPointTheme.cyanGlow)
+                        .foregroundStyle(WayPointTheme.sapphireAccent)
 
                     Spacer()
 
@@ -101,12 +128,14 @@ struct ItineraryDetailView: View {
                         .foregroundStyle(WayPointTheme.textTertiary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(WayPointTheme.obsidianSurface, in: Capsule())
+                        .background(WayPointTheme.cardSurface, in: Capsule())
                 }
 
                 Text(item.title)
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundStyle(WayPointTheme.textPrimary)
+                    .lineLimit(nil)
+                    .minimumScaleFactor(0.8)
 
                 Text(item.subtitle)
                     .font(.body)
@@ -118,16 +147,17 @@ struct ItineraryDetailView: View {
     // MARK: - Location Section
 
     private var locationSection: some View {
-        GlassCardView(cornerRadius: 18, padding: 16) {
+        GlassCardView(cornerRadius: 16, padding: 16) {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(WayPointTheme.cyanGlow.opacity(0.15))
+                        .fill(WayPointTheme.sapphireAccent.opacity(0.15))
                         .frame(width: 40, height: 40)
 
                     Image(systemName: "mappin.and.ellipse")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(WayPointTheme.cyanGlow)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(WayPointTheme.sapphireAccent)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -148,12 +178,13 @@ struct ItineraryDetailView: View {
     // MARK: - Notes Section
 
     private func notesSection(notes: String) -> some View {
-        GlassCardView(cornerRadius: 18, padding: 16) {
+        GlassCardView(cornerRadius: 16, padding: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: "note.text")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(WayPointTheme.violetGlow)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(WayPointTheme.emeraldRecovery)
 
                     Text("Co-Pilot Notes")
                         .font(.caption.weight(.bold))
@@ -168,34 +199,109 @@ struct ItineraryDetailView: View {
         }
     }
 
-    // MARK: - Cost Breakdown Section
+    // MARK: - Cost & 3% Fee Breakdown Section
 
-    private var costBreakdownSection: some View {
-        GlassCardView(cornerRadius: 18, padding: 16) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Estimated Cost")
-                        .font(.caption.weight(.medium))
+    private var priceBreakdownCard: some View {
+        let baseCost = item.estimatedCost == 0 ? Decimal(45.0) : item.estimatedCost
+        let (baseDec, feeDec, totalDec) = FeeEngine.calculate(basePrice: baseCost)
+
+        return GlassCardView(cornerRadius: 16, padding: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("PRICING & PLATFORM COMMISSION")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .tracking(1.0)
                         .foregroundStyle(WayPointTheme.textSecondary)
-
-                    Text(item.formattedCost)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(WayPointTheme.cyanGlow)
+                    Spacer()
+                    Text("3% FEE ACTIVE")
+                        .font(.system(size: 8.5, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(WayPointTheme.sapphireAccent)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(WayPointTheme.sapphireAccent.opacity(0.15), in: Capsule())
                 }
 
-                Spacer()
+                VStack(spacing: 6) {
+                    HStack {
+                        Text("Ticket / Booking Subtotal")
+                            .font(.subheadline)
+                            .foregroundStyle(WayPointTheme.textSecondary)
+                        Spacer()
+                        Text(FeeEngine.format(amount: baseDec, currencyCode: item.currencyCode))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(WayPointTheme.textPrimary)
+                    }
 
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Category")
-                        .font(.caption)
-                        .foregroundStyle(WayPointTheme.textTertiary)
+                    HStack {
+                        Text("WayPoint Concierge & Auto-Sync (3%)")
+                            .font(.subheadline)
+                            .foregroundStyle(WayPointTheme.textSecondary)
+                        Spacer()
+                        Text("+\(FeeEngine.format(amount: feeDec, currencyCode: item.currencyCode))")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(WayPointTheme.sapphireAccent)
+                    }
 
-                    Text(item.category.displayName)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(WayPointTheme.textPrimary)
+                    Divider().overlay(WayPointTheme.hairlineStroke)
+
+                    HStack {
+                        Text("Total Charged")
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(WayPointTheme.textPrimary)
+                        Spacer()
+                        Text(FeeEngine.format(amount: totalDec, currencyCode: item.currencyCode))
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundStyle(WayPointTheme.emeraldRecovery)
+                    }
                 }
             }
         }
+    }
+
+    private var applePayBookingButton: some View {
+        let baseCost = item.estimatedCost == 0 ? Decimal(45.0) : item.estimatedCost
+        let (_, _, totalDec) = FeeEngine.calculate(basePrice: baseCost)
+        let totalStr = FeeEngine.format(amount: totalDec, currencyCode: item.currencyCode)
+
+        return Button(action: executeApplePayBooking) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.title3.weight(.bold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(WayPointTheme.emeraldRecovery)
+                Text("Confirm Pass Reservation (\(totalStr))")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(WayPointTheme.hairlineStroke, lineWidth: 1.5)
+            )
+            .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
+            .sensoryFeedback(.impact(weight: .medium), trigger: item.isCompleted)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Confirm Pass Reservation for \(totalStr) with Apple Pay")
+        .accessibilityHint("Double tap to confirm reservation and mark activity complete")
+        .accessibilityAddTraits(.isButton)
+    }
+
+
+    private func executeApplePayBooking() {
+        #if canImport(UIKit)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        #endif
+
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.38, dampingFraction: 0.8)) {
+            item.isCompleted = true
+            onToggleCompletion?()
+        }
+
+        dismiss()
     }
 
     // MARK: - Completion Toggle Button
@@ -232,6 +338,9 @@ struct ItineraryDetailView: View {
                 radius: 12, x: 0, y: 6
             )
         }
+        .accessibilityLabel(item.isCompleted ? "Mark incomplete" : "Mark as completed")
+        .accessibilityValue(item.isCompleted ? "Completed" : "Not completed")
+        .accessibilityAddTraits(.isButton)
     }
 
     private func toggleCompletion() {

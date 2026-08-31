@@ -9,6 +9,7 @@ struct SettingsView: View {
     @Environment(SubscriptionManager.self) private var subscriptionManager
     @Environment(SupabaseService.self) private var supabaseService
     @Environment(NotificationManager.self) private var notificationManager
+    @Environment(TripStore.self) private var tripStore
 
     @State private var showPaywall = false
     @State private var flightAlertsEnabled = true
@@ -55,6 +56,8 @@ struct SettingsView: View {
         .padding(.top, 8)
     }
 
+    @State private var showResetConfirmation = false
+
     // MARK: - Account Sync Section
 
     private var accountSyncSection: some View {
@@ -76,20 +79,20 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(WayPointTheme.textTertiary)
 
-                        Text(supabaseService.currentUserEmail ?? "Not signed in")
+                        Text(supabaseService.currentUserEmail ?? "Guest Traveler")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(WayPointTheme.textPrimary)
                     }
 
                     Spacer()
 
-                    if supabaseService.isSyncing {
+                    if tripStore.isSyncing {
                         ProgressView()
                             .tint(WayPointTheme.cyanGlow)
                     } else {
                         Button(action: {
                             Task {
-                                await supabaseService.syncOfflineChanges()
+                                await tripStore.retryFailedSync()
                             }
                         }) {
                             HStack(spacing: 4) {
@@ -106,8 +109,32 @@ struct SettingsView: View {
                     }
                 }
 
-                if let lastSynced = supabaseService.lastSyncedAt {
-                    Text("Last synced: \(lastSynced.formatted(date: .abbreviated, time: .shortened))")
+                if !tripStore.syncQueue.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.arrow.2.circlepath")
+                            .font(.caption)
+                            .foregroundStyle(WayPointTheme.budgetWarning)
+                        Text("\(tripStore.syncQueue.count) pending mutations in sync queue")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(WayPointTheme.budgetWarning)
+                    }
+                }
+
+                if let syncError = tripStore.syncError {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.red)
+                        Text(syncError)
+                            .font(.caption)
+                            .foregroundStyle(Color.red)
+                    }
+                } else if let lastSynced = tripStore.lastSyncedAt {
+                    Text("Last synced: \(lastSynced.formatted(date: .abbreviated, time: .shortened)) (Revision v\(tripStore.activeTrip.version))")
+                        .font(.caption2)
+                        .foregroundStyle(WayPointTheme.textSecondary)
+                } else {
+                    Text("Device Revision: v\(tripStore.activeTrip.version)")
                         .font(.caption2)
                         .foregroundStyle(WayPointTheme.textSecondary)
                 }
@@ -225,7 +252,7 @@ struct SettingsView: View {
                         .font(.headline)
                         .foregroundStyle(WayPointTheme.cyanGlow)
 
-                    Text("Offline Storage")
+                    Text("Offline Storage & Reset")
                         .font(.headline)
                         .foregroundStyle(WayPointTheme.textPrimary)
                 }
@@ -242,30 +269,52 @@ struct SettingsView: View {
                     }
                 }
                 .tint(WayPointTheme.cyanGlow)
+
+                Button(action: { showResetConfirmation = true }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "trash.fill")
+                            .font(.caption.weight(.bold))
+                        Text("Reset Local Cache to Demo State")
+                            .font(.caption.weight(.bold))
+                    }
+                    .foregroundStyle(Color.red)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                }
+                .alert("Reset Local Data?", isPresented: $showResetConfirmation) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Reset Data", role: .destructive) {
+                        tripStore.resetLocalStoreToSample()
+                    }
+                } message: {
+                    Text("This will clear local trip caches and restore the Tokyo demo itinerary state.")
+                }
             }
         }
     }
 
-    // MARK: - Legal Section
+    @State private var activeLegalDoc: LegalDocumentView.DocumentType? = nil
 
     private var legalSection: some View {
         VStack(spacing: 12) {
             HStack(spacing: 16) {
-                Button("Privacy Policy") {}
+                Button("Privacy Policy") { activeLegalDoc = .privacyPolicy }
                 Text("•")
-                Button("Terms of Service") {}
-                Text("•")
-                Button("Licenses") {}
+                Button("Terms of Service") { activeLegalDoc = .termsOfService }
             }
-            .font(.caption)
-            .foregroundStyle(WayPointTheme.textTertiary)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(WayPointTheme.cyanGlow)
 
-            Text("WayPoint v1.0.0 (Build 42)")
+            Text("WayPoint v1.0.0 (Build 42) — All Rights Reserved")
                 .font(.caption2)
                 .foregroundStyle(WayPointTheme.textTertiary.opacity(0.6))
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
+        .sheet(item: $activeLegalDoc) { doc in
+            LegalDocumentView(documentType: doc)
+        }
     }
 }
 

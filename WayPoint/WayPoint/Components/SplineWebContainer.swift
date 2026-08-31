@@ -26,11 +26,13 @@ final class SplineWebViewManager {
         config.allowsInlineMediaPlayback = true
 
         let css = """
-        a[href*="spline"], [class*="watermark"], [class*="logo"], [id*="spline"], #logo {
+        a[href*="spline"], [class*="watermark"], [class*="logo"], [id*="spline"], #logo, [class*="badge"], canvas + div, body > div:last-child {
             display: none !important;
             visibility: hidden !important;
             opacity: 0 !important;
             pointer-events: none !important;
+            height: 0 !important;
+            width: 0 !important;
         }
         """
         let scriptSource = "var style = document.createElement('style'); style.innerHTML = '\(css.replacingOccurrences(of: "\n", with: " "))'; document.head.appendChild(style);"
@@ -49,6 +51,8 @@ final class SplineWebViewManager {
         wv.layer.backgroundColor = UIColor.clear.cgColor
         wv.scrollView.isScrollEnabled = false
         wv.isUserInteractionEnabled = false
+        wv.clipsToBounds = true
+        wv.scrollView.clipsToBounds = true
 
         let htmlString = """
         <!DOCTYPE html>
@@ -59,11 +63,13 @@ final class SplineWebViewManager {
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body, html { width: 100%; height: 100%; overflow: hidden; background: transparent; }
                 iframe { width: 100vw; height: 100vh; border: 0; object-fit: cover; pointer-events: none; }
-                a[href*="spline"], [class*="watermark"], [class*="logo"], [id*="spline"], #logo {
+                a[href*="spline"], [class*="watermark"], [class*="logo"], [id*="spline"], #logo, [class*="badge"], canvas + div, body > div:last-child {
                     display: none !important;
                     visibility: hidden !important;
                     opacity: 0 !important;
                     pointer-events: none !important;
+                    height: 0 !important;
+                    width: 0 !important;
                 }
             </style>
         </head>
@@ -84,7 +90,9 @@ struct SplineWebContainer: UIViewRepresentable {
     let urlString: String
 
     func makeUIView(context: Context) -> WKWebView {
-        return SplineWebViewManager.shared.webView(for: urlString)
+        let wv = SplineWebViewManager.shared.webView(for: urlString)
+        wv.clipsToBounds = true
+        return wv
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {

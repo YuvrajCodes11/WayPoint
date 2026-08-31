@@ -163,10 +163,11 @@ struct OTPAuthSheetView: View {
                     )
                 }
 
-                // Phone/Email TextField
+            // Phone/Email TextField
                 TextField("Phone or Email", text: $contactInput)
                     .font(.body.weight(.medium))
                     .foregroundStyle(WayPointTheme.textPrimary)
+                    .textInputAutocapitalization(.never)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .keyboardType(.emailAddress)
@@ -205,7 +206,7 @@ struct OTPAuthSheetView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .shadow(color: WayPointTheme.cyanGlow.opacity(0.35), radius: 12, x: 0, y: 6)
             }
-            .disabled(contactInput.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+            .disabled(contactInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
         }
     }
 
@@ -213,16 +214,17 @@ struct OTPAuthSheetView: View {
 
     private var verifyStepView: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack(spacing: 4) {
-                Text("Sent 6-digit code to")
+            HStack(alignment: .top, spacing: 8) {
+                (Text("Sent 6-digit code to ")
                     .font(.subheadline)
                     .foregroundStyle(WayPointTheme.textSecondary)
-
-                Text("\(countryCode) \(contactInput)")
+                + Text(formattedContactForAuth)
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(WayPointTheme.cyanGlow)
+                    .foregroundStyle(WayPointTheme.cyanGlow))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                Spacer()
+                Spacer(minLength: 8)
 
                 Button("Edit") {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -230,6 +232,13 @@ struct OTPAuthSheetView: View {
                     }
                 }
                 .font(.caption.weight(.bold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(WayPointTheme.obsidianElevated, in: Capsule())
+                .overlay(
+                    Capsule()
+                        .strokeBorder(WayPointTheme.glassBorder, lineWidth: 1)
+                )
                 .foregroundStyle(WayPointTheme.violetGlow)
             }
 
@@ -281,7 +290,7 @@ struct OTPAuthSheetView: View {
                     .foregroundStyle(WayPointTheme.budgetOver)
             }
 
-            // Resend Countdown
+            // Resend Countdown & Demo Code Hint
             HStack {
                 if countdown > 0 {
                     Text("Resend code in \(countdown)s")
@@ -297,6 +306,19 @@ struct OTPAuthSheetView: View {
                 }
 
                 Spacer()
+
+                #if DEBUG
+                HStack(spacing: 4) {
+                    Image(systemName: "key.fill")
+                        .font(.caption2)
+                    Text("Demo: 123456")
+                        .font(.caption2.weight(.bold))
+                }
+                .foregroundStyle(WayPointTheme.cyanGlow)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(WayPointTheme.cyanGlow.opacity(0.12), in: Capsule())
+                #endif
             }
 
             // Verify Button
@@ -329,15 +351,35 @@ struct OTPAuthSheetView: View {
         return otpCode[charIndex]
     }
 
-    // MARK: - Actions
+    // MARK: - Helper Formatting & Actions
+
+    private var sanitizedContactInput: String {
+        contactInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var formattedContactForAuth: String {
+        let trimmed = sanitizedContactInput
+        if trimmed.contains("@") {
+            return trimmed.lowercased()
+        } else {
+            let digits = trimmed.filter { $0.isNumber || $0 == "+" }
+            if digits.hasPrefix("+") {
+                return digits
+            }
+            let prefix = countryCode.components(separatedBy: " ").last ?? "+1"
+            return "\(prefix)\(digits)"
+        }
+    }
 
     private func handleSendOTP() {
+        let target = formattedContactForAuth
+        guard !target.isEmpty else { return }
+
         isLoading = true
         errorMessage = nil
         Task {
             do {
-                let formattedContact = "\(countryCode) \(contactInput)"
-                try await supabaseService.signInWithOTP(emailOrPhone: formattedContact)
+                try await supabaseService.signInWithOTP(emailOrPhone: target)
                 isLoading = false
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     step = .verify

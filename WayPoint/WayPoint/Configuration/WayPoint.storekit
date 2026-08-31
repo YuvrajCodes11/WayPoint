@@ -1,0 +1,80 @@
+{
+  "identifier" : "WayPointStoreKitConfig",
+  "nonRenewingSubscriptions" : [ ],
+  "products" : [ ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [ ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "WayPointProGroup",
+      "localizations" : [
+        {
+          "description" : "Access all WayPoint Pro travel planning features.",
+          "displayName" : "WayPoint Pro Subscription",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "WayPointProGroup",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "com.waypoint.weekly",
+          "introductoryOffer" : {
+            "internalID" : "intro_weekly_3d_trial",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "localizations" : [
+            {
+              "description" : "Weekly Pro Pass with 3-day Free Trial",
+              "displayName" : "WayPoint Weekly Pro",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.waypoint.weekly",
+          "recurringSubscriptionPeriod" : "P1W",
+          "referenceName" : "Weekly Pro",
+          "subscriptionGroupID" : "WayPointProGroup",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "29.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "com.waypoint.annual",
+          "introductoryOffer" : {
+            "internalID" : "intro_annual_7d_trial",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P7D"
+          },
+          "localizations" : [
+            {
+              "description" : "Annual Pro Pass with 7-day Free Trial",
+              "displayName" : "WayPoint Annual Pro",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.waypoint.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Annual Pro",
+          "subscriptionGroupID" : "WayPointProGroup",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

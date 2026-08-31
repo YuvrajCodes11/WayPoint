@@ -43,6 +43,8 @@ enum BookingType: String, Codable, CaseIterable, Identifiable {
 
 struct Booking: Identifiable, Codable, Hashable {
     let id: UUID
+    var userID: UUID?
+    var tripID: UUID?
     var title: String
     var provider: String
     var confirmationCode: String
@@ -54,8 +56,19 @@ struct Booking: Identifiable, Codable, Hashable {
     var location: String?
     var cost: Decimal?
 
+    enum CodingKeys: String, CodingKey {
+        case id, title, provider, type, date, notes, location, cost
+        case userID = "user_id"
+        case tripID = "trip_id"
+        case confirmationCode = "confirmation_code"
+        case seatOrRoom = "seat_or_room"
+        case barcodeData = "barcode_data"
+    }
+
     init(
         id: UUID = UUID(),
+        userID: UUID? = nil,
+        tripID: UUID? = nil,
         title: String,
         provider: String = "WayPoint Travel",
         confirmationCode: String = "CONF-0000",
@@ -73,6 +86,8 @@ struct Booking: Identifiable, Codable, Hashable {
         cost: Decimal? = nil
     ) {
         self.id = id
+        self.userID = userID
+        self.tripID = tripID
         self.title = title
         self.provider = provider
         let code = confirmationNumber ?? confirmationCode
@@ -98,13 +113,66 @@ struct Booking: Identifiable, Codable, Hashable {
         return formatter.string(from: date)
     }
 
-    var formattedCost: String {
+    func formattedCost(currencyCode: String = "USD") -> String {
         guard let cost = cost else { return "" }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "AED"
-        return formatter.string(from: cost as NSDecimalNumber) ?? "AED \(cost)"
+        return LocaleManager.formatCurrency(cost, currencyCode: currencyCode)
+    }
+
+    var formattedCost: String {
+        formattedCost(currencyCode: "USD")
     }
 }
+
+// MARK: - Sample Passes Initializer
+
+extension Booking {
+    static var samplePasses: [Booking] {
+        let calendar = Calendar.current
+        let now = Date()
+        let today9am = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: now) ?? now
+        let today3pm = calendar.date(bySettingHour: 15, minute: 0, second: 0, of: now) ?? now
+        let today430pm = calendar.date(bySettingHour: 16, minute: 30, second: 0, of: now) ?? now
+
+        return [
+            Booking(
+                title: "ANA Airways NH 107",
+                provider: "All Nippon Airways",
+                confirmationCode: "NH107-JFK",
+                type: .flight,
+                date: today9am,
+                seatOrRoom: "Gate 14B · Seat 2A",
+                barcodeData: "NH107-HND-JFK-SEAT-2A",
+                notes: "Confirmed status · Boarding 10:45 AM · First Class Cabin",
+                location: "HND Tokyo ➔ JFK New York",
+                cost: 1450
+            ),
+            Booking(
+                title: "TRUNK (HOTEL) Shibuya",
+                provider: "TRUNK Hospitality Group",
+                confirmationCode: "#TRK-8821",
+                type: .hotel,
+                date: today3pm,
+                seatOrRoom: "Suite 402 · Check-in 3:00 PM (2 Nights)",
+                barcodeData: "TRK-8821-CHECKIN-3PM",
+                notes: "Complimentary breakfast & rooftop lounge access included.",
+                location: "Shibuya, Tokyo, Japan",
+                cost: 620
+            ),
+            Booking(
+                title: "TeamLab Planets Tokyo",
+                provider: "teamLab Planets Exhibition",
+                confirmationCode: "TLP-VIP-994",
+                type: .activity,
+                date: today430pm,
+                seatOrRoom: "VIP Express Pass · Entry 4:30 PM",
+                barcodeData: "TLP-VIP-ENTRY-430PM",
+                notes: "Fast-track entrance line & digital art souvenir kit included.",
+                location: "Odaiba, Tokyo, Japan",
+                cost: 85
+            )
+        ]
+    }
+}
+
 
 
