@@ -264,83 +264,63 @@ struct HomeView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(greeting)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(WayPointTheme.textSecondary)
-
-                    Text(displayTravelerName)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(greeting), \(displayTravelerName)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundStyle(WayPointTheme.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.caption2.weight(.semibold))
+                        Text(locationService.currentCityCountry == "Detecting location..." ? (trip.destination.isEmpty ? "Tokyo, Japan" : trip.destination) : locationService.currentCityCountry)
+                            .font(.caption.weight(.medium))
+                    }
+                    .foregroundStyle(WayPointTheme.sapphireAccent)
                 }
 
                 Spacer()
 
-                HStack(spacing: 8) {
-                    liveActivityPill
-
+                HStack(spacing: 6) {
                     Button(action: { showSocialImportSheet = true }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 3) {
                             Image(systemName: "link.badge.plus")
                                 .font(.caption2.weight(.bold))
                             Text("IMPORT")
-                                .font(.caption2.weight(.heavy))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
                         }
-                        .foregroundStyle(WayPointTheme.cyanGlow)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(WayPointTheme.cyanGlow.opacity(0.18), in: Capsule())
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(WayPointTheme.cyanGlow.opacity(0.5), lineWidth: 1)
-                        )
+                        .foregroundStyle(WayPointTheme.sapphireAccent)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 7)
+                        .background(WayPointTheme.sapphireAccent.opacity(0.18), in: Capsule())
+                        .overlay(Capsule().strokeBorder(WayPointTheme.sapphireAccent.opacity(0.4), lineWidth: 1))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Import travel link or itinerary")
-                    .accessibilityHint("Double tap to import booking details or paste social links")
-                    .accessibilityAddTraits(.isButton)
+                    .buttonStyle(.scalePress)
+
+                    Button(action: { showSharePulseSheet = true }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "square.and.arrow.up.fill")
+                                .font(.caption2.weight(.bold))
+                            Text("SHARE")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        }
+                        .foregroundStyle(WayPointTheme.emeraldRecovery)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 7)
+                        .background(WayPointTheme.emeraldRecovery.opacity(0.18), in: Capsule())
+                        .overlay(Capsule().strokeBorder(WayPointTheme.emeraldRecovery.opacity(0.4), lineWidth: 1))
+                    }
+                    .buttonStyle(.scalePress)
 
                     Button(action: { showPaywall = true }) {
                         proBadge
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(subscriptionManager.isProMember ? "Pro Member Active" : "Get Pro Membership")
-                    .accessibilityHint("Double tap to view Pro membership details")
-                    .accessibilityAddTraits(.isButton)
+                    .buttonStyle(.scalePress)
                 }
+                .fixedSize(horizontal: true, vertical: false)
             }
-
-            HStack(spacing: 6) {
-                Image(systemName: "mappin.and.ellipse")
-                    .font(.caption.weight(.semibold))
-                Text(locationService.currentCityCountry == "Detecting location..." ? (trip.destination.isEmpty ? "Tokyo, Japan" : trip.destination) : locationService.currentCityCountry)
-                    .font(.subheadline.weight(.medium))
-
-                Spacer()
-
-                Button(action: { showSharePulseSheet = true }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "square.and.arrow.up.fill")
-                            .font(.caption2.weight(.bold))
-                        Text("SHARE PULSE")
-                            .font(.caption2.weight(.heavy))
-                    }
-                    .foregroundStyle(WayPointTheme.cyanGlow)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(WayPointTheme.cyanGlow.opacity(0.18), in: Capsule())
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(WayPointTheme.cyanGlow.opacity(0.5), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Share Trip Pulse")
-                .accessibilityHint("Double tap to generate and share your trip recap card")
-                .accessibilityAddTraits(.isButton)
-            }
-            .foregroundStyle(WayPointTheme.accentGradient)
 
             if liveActivityManager.isActivityActive {
                 HStack(spacing: 6) {
@@ -348,17 +328,11 @@ struct HomeView: View {
                         .fill(Color.green)
                         .frame(width: 8, height: 8)
                     Text("LIVE RADAR ACTIVE ON DYNAMIC ISLAND")
-                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .font(.system(size: 9.5, weight: .heavy, design: .monospaced))
                         .foregroundStyle(Color.green)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Color.green.opacity(0.12), in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.green.opacity(0.4), lineWidth: 1))
-                .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding(.top, 16)
     }
 
     private var liveActivityPill: some View {

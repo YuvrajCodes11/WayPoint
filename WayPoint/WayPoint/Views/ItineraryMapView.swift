@@ -11,10 +11,12 @@ import MapKit
 struct ItineraryMapView: View {
     @Environment(TripStore.self) private var tripStore
     @State private var selectedItem: ItineraryItem? = nil
+    @State private var selectedStopIndex: Int = 0
     @State private var position: MapCameraPosition = .automatic
     @State private var locationService = LocationService.shared
     @State private var directionError: String? = nil
     @State private var routeSheetItem: ItineraryItem? = nil
+    @State private var openMapsToast: String? = nil
 
     private var currentDayPlan: DayPlan {
         tripStore.currentDayPlan
@@ -29,8 +31,6 @@ struct ItineraryMapView: View {
         }
     }
 
-    @State private var openMapsToast: String? = nil
-
     var body: some View {
         ZStack {
             // Layer 1: Native Interactive Map View
@@ -39,10 +39,10 @@ struct ItineraryMapView: View {
 
                 if coordinates.count > 1 {
                     MapPolyline(coordinates: coordinates)
-                        .stroke(WayPointTheme.cyanGlow, lineWidth: 3)
+                        .stroke(WayPointTheme.sapphireAccent, lineWidth: 3.5)
                 }
 
-                ForEach(currentDayPlan.items, id: \.id) { item in
+                ForEach(Array(currentDayPlan.items.enumerated()), id: \.element.id) { index, item in
                     if let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) {
                         Annotation(
                             item.title,
@@ -55,6 +55,7 @@ struct ItineraryMapView: View {
                                     #endif
                                     withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
                                         selectedItem = item
+                                        selectedStopIndex = index
                                         updateCameraPosition(for: item)
                                     }
                                 }
@@ -73,7 +74,7 @@ struct ItineraryMapView: View {
             VStack {
                 topHeaderOverlay
                     .allowsHitTesting(true)
-                
+
                 if let mapsToast = openMapsToast {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
@@ -85,8 +86,8 @@ struct ItineraryMapView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(WayPointTheme.cyanGlow, in: Capsule())
-                    .shadow(color: WayPointTheme.cyanGlow.opacity(0.4), radius: 10, x: 0, y: 4)
+                    .background(WayPointTheme.emeraldRecovery, in: Capsule())
+                    .shadow(color: WayPointTheme.emeraldRecovery.opacity(0.4), radius: 10, x: 0, y: 4)
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .padding(.top, 8)
                 }
@@ -95,10 +96,10 @@ struct ItineraryMapView: View {
             }
             .allowsHitTesting(false)
 
-            // Layer 3: Synchronized Horizontal Card Deck Overlay
+            // Layer 3: Synchronized Paging Carousel Overlay
             VStack {
                 Spacer()
-                horizontalCardDeck
+                pagingCardCarousel
                     .padding(.bottom, 95)
                     .allowsHitTesting(true)
             }
@@ -106,12 +107,23 @@ struct ItineraryMapView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            if selectedItem == nil {
-                selectedItem = currentDayPlan.items.first
+            if selectedItem == nil, let first = currentDayPlan.items.first {
+                selectedItem = first
+                selectedStopIndex = 0
             }
             updateCameraPosition(for: selectedItem)
         }
+        .onChange(of: selectedStopIndex) { _, newIndex in
+            if currentDayPlan.items.indices.contains(newIndex) {
+                let targetItem = currentDayPlan.items[newIndex]
+                selectedItem = targetItem
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+                    updateCameraPosition(for: targetItem)
+                }
+            }
+        }
         .onChange(of: tripStore.activeTrip.selectedDayIndex) {
+            selectedStopIndex = 0
             selectedItem = currentDayPlan.items.first
             updateCameraPosition(for: selectedItem)
         }
@@ -131,107 +143,102 @@ struct ItineraryMapView: View {
     // MARK: - Top Header Overlay
 
     private var topHeaderOverlay: some View {
-        VStack(spacing: 8) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("GPS RADAR & MAP")
-                        .font(.caption.weight(.bold))
-                        .tracking(1.5)
-                        .foregroundStyle(WayPointTheme.cyanGlow)
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("GPS RADAR & MAP")
+                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                    .tracking(1.4)
+                    .foregroundStyle(WayPointTheme.sapphireAccent)
 
-                    Text(currentDayPlan.title)
-                        .font(.title3.weight(.bold))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .foregroundStyle(WayPointTheme.textPrimary)
-                }
+                Text(currentDayPlan.title)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(WayPointTheme.textPrimary)
+                    .lineLimit(1)
+            }
 
-                Spacer()
+            Spacer()
 
-                Menu {
-                    ForEach(Array(tripStore.activeTrip.days.enumerated()), id: \.element.id) { index, day in
-                        Button("Day \(index + 1): \(day.title)") {
-                            #if canImport(UIKit)
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            #endif
-                            withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
-                                tripStore.selectDay(index)
-                            }
+            Menu {
+                ForEach(Array(tripStore.activeTrip.days.enumerated()), id: \.element.id) { index, day in
+                    Button("Day \(index + 1): \(day.title)") {
+                        #if canImport(UIKit)
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        #endif
+                        withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+                            tripStore.selectDay(index)
+                            selectedStopIndex = 0
+                            selectedItem = tripStore.currentDayPlan.items.first
+                            updateCameraPosition(for: selectedItem)
                         }
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("Day \(tripStore.activeTrip.selectedDayIndex + 1)")
-                            .font(.caption.weight(.bold))
-                        Image(systemName: "chevron.down")
-                            .font(.caption2.weight(.bold))
-                    }
-                    .foregroundStyle(WayPointTheme.obsidian)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(WayPointTheme.accentGradient, in: Capsule())
-                    .shadow(color: WayPointTheme.cyanGlow.opacity(0.3), radius: 8, x: 0, y: 3)
                 }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Day \(tripStore.activeTrip.selectedDayIndex + 1)")
+                        .font(.caption.weight(.bold))
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.bold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(WayPointTheme.sapphireAccent, in: Capsule())
+                .shadow(color: WayPointTheme.sapphireAccent.opacity(0.4), radius: 8, x: 0, y: 3)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 50)
+            .buttonStyle(.scalePress)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(WayPointTheme.hairlineStroke, lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
     }
 
-    // MARK: - Synchronized Horizontal Card Deck Overlay
+    // MARK: - Synchronized Horizontal Paging Card Carousel Overlay
 
-    private var horizontalCardDeck: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(currentDayPlan.items, id: \.id) { item in
-                        venueCard(item: item)
-                            .id(item.id)
-                            .onTapGesture {
-                                #if canImport(UIKit)
-                                UISelectionFeedbackGenerator().selectionChanged()
-                                #endif
-                                withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
-                                    selectedItem = item
-                                    updateCameraPosition(for: item)
-                                }
-                            }
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-            .onChange(of: selectedItem?.id) { _, newID in
-                if let targetID = newID {
-                    withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
-                        proxy.scrollTo(targetID, anchor: .center)
-                    }
-                }
+    private var pagingCardCarousel: some View {
+        TabView(selection: $selectedStopIndex) {
+            ForEach(Array(currentDayPlan.items.enumerated()), id: \.offset) { index, item in
+                venueCard(item: item, index: index)
+                    .tag(index)
+                    .padding(.horizontal, 16)
             }
         }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .frame(height: 140)
     }
 
-    private func venueCard(item: ItineraryItem) -> some View {
+    private func venueCard(item: ItineraryItem, index: Int) -> some View {
         let isSelected = selectedItem?.id == item.id
-        let hasValidCoord = item.coordinate != nil && LocationService.isValidCoordinate(latitude: item.coordinate!.latitude, longitude: item.coordinate!.longitude)
 
         return GlassCardView(
             cornerRadius: 20,
             padding: 14,
-            glowColor: isSelected ? WayPointTheme.cyanGlow : .clear
+            glowColor: isSelected ? WayPointTheme.sapphireAccent : .clear
         ) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
+                            Text("STOP \(index + 1)")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundStyle(WayPointTheme.sapphireAccent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(WayPointTheme.sapphireAccent.opacity(0.18), in: Capsule())
+
                             Image(systemName: item.category.systemImage)
                                 .font(.caption2.weight(.bold))
+                                .foregroundStyle(WayPointTheme.textSecondary)
+
                             Text(item.category.displayName.uppercased())
-                                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(WayPointTheme.textSecondary)
                         }
-                        .foregroundStyle(WayPointTheme.cyanGlow)
 
                         Text(item.title)
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(WayPointTheme.textPrimary)
                             .lineLimit(1)
 
@@ -242,52 +249,43 @@ struct ItineraryMapView: View {
 
                     Spacer(minLength: 8)
 
-                    if hasValidCoord {
-                        Button(action: { openInAppleMaps(item: item) }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("Directions")
-                                    .font(.system(size: 11, weight: .bold))
-                            }
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(WayPointTheme.accentGradient, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    } else {
+                    Button(action: {
+                        routeSheetItem = item
+                    }) {
                         HStack(spacing: 4) {
-                            Image(systemName: "location.slash.fill")
-                                .font(.caption2)
-                            Text("Offline Stop")
-                                .font(.system(size: 10, weight: .bold))
+                            Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                                .font(.caption.weight(.bold))
+                            Text("Directions")
+                                .font(.caption2.weight(.bold))
                         }
-                        .foregroundStyle(WayPointTheme.textTertiary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(WayPointTheme.obsidianElevated, in: Capsule())
-                        .overlay(Capsule().strokeBorder(WayPointTheme.glassBorder, lineWidth: 1))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(
+                            LinearGradient(
+                                colors: [WayPointTheme.sapphireAccent, WayPointTheme.emeraldRecovery],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            in: Capsule()
+                        )
+                        .shadow(color: WayPointTheme.sapphireAccent.opacity(0.4), radius: 8, x: 0, y: 3)
                     }
+                    .buttonStyle(.scalePress)
                 }
 
                 HStack(spacing: 4) {
-                    Image(systemName: "mappin")
+                    Image(systemName: "mappin.and.ellipse")
                         .font(.caption2)
-                        .foregroundStyle(WayPointTheme.textTertiary)
+                        .foregroundStyle(WayPointTheme.sapphireAccent)
+
                     Text(item.location)
-                        .font(.caption2)
+                        .font(.caption2.weight(.medium))
                         .foregroundStyle(WayPointTheme.textSecondary)
                         .lineLimit(1)
                 }
             }
-            .frame(width: 270)
         }
-        .scaleEffect(isSelected ? 1.02 : 0.98)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(isSelected ? WayPointTheme.cyanGlow : WayPointTheme.glassBorder, lineWidth: isSelected ? 1.5 : 1)
-        )
     }
 
     // MARK: - Camera & Routing Helpers
@@ -297,29 +295,22 @@ struct ItineraryMapView: View {
             let clCoord = CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
             let region = MKCoordinateRegion(
                 center: clCoord,
-                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
             )
             position = .region(region)
         } else if let userLoc = locationService.currentLocation?.coordinate {
             let region = MKCoordinateRegion(
                 center: userLoc,
-                span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
             )
             position = .region(region)
         } else if let firstCoord = coordinates.first {
             let region = MKCoordinateRegion(
                 center: firstCoord,
-                span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
             )
             position = .region(region)
         }
-    }
-
-    private func openInAppleMaps(item: ItineraryItem) {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
-        routeSheetItem = item
     }
 }
 
@@ -332,13 +323,13 @@ private struct MapMarkerPin: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(isSelected ? WayPointTheme.cyanGlow : WayPointTheme.obsidianElevated)
+                .fill(isSelected ? WayPointTheme.sapphireAccent : WayPointTheme.cardSurface)
                 .frame(width: 38, height: 38)
-                .shadow(color: WayPointTheme.cyanGlow.opacity(isSelected ? 0.6 : 0.2), radius: 8)
+                .shadow(color: WayPointTheme.sapphireAccent.opacity(isSelected ? 0.6 : 0.2), radius: 8)
 
             Image(systemName: item.category.systemImage)
                 .font(.caption.weight(.bold))
-                .foregroundStyle(isSelected ? .black : WayPointTheme.cyanGlow)
+                .foregroundStyle(isSelected ? .white : WayPointTheme.sapphireAccent)
         }
         .scaleEffect(isSelected ? 1.2 : 1.0)
         .animation(.spring(response: 0.38, dampingFraction: 0.8), value: isSelected)
