@@ -22,6 +22,7 @@ struct HomeView: View {
 
     @State private var selectedItemID: UUID?
     @State private var detailItem: ItineraryItem? = nil
+    @State private var routeItem: ItineraryItem? = nil
     @State private var showPaywall = false
     @State private var showRecalculateSheet = false
     @State private var showSocialImportSheet = false
@@ -142,6 +143,9 @@ struct HomeView: View {
             ItineraryDetailView(
                 item: bindingForDetailItem(item)
             )
+        }
+        .sheet(item: $routeItem) { item in
+            InAppRouteSheet(item: item)
         }
     }
 
@@ -668,12 +672,11 @@ struct HomeView: View {
                         item: item,
                         isFirst: index == 0,
                         isLast: index == currentDayPlan.items.count - 1,
-                        isSelected: selectedItemID == item.id
-                    ) {
-                        detailItem = item
-                    } onToggleComplete: {
-                        toggleItemCompletion(item)
-                    }
+                        isSelected: selectedItemID == item.id,
+                        onTap: { detailItem = item },
+                        onToggleComplete: { toggleItemCompletion(item) },
+                        onOpenRoute: { targetItem in routeItem = targetItem }
+                    )
                 }
             }
         }
@@ -787,6 +790,7 @@ private struct TimelineCard: View {
     let isSelected: Bool
     let onTap: () -> Void
     let onToggleComplete: () -> Void
+    var onOpenRoute: ((ItineraryItem) -> Void)? = nil
 
     @State private var isPressed: Bool = false
 
@@ -930,12 +934,7 @@ private struct TimelineCard: View {
     }
 
     private func openInAppleMaps(for item: ItineraryItem) {
-        let query = item.location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        if let url = URL(string: "http://maps.apple.com/?q=\(query)") {
-            #if canImport(UIKit)
-            UIApplication.shared.open(url)
-            #endif
-        }
+        onOpenRoute?(item)
     }
 
     private var thumbnailImageView: some View {

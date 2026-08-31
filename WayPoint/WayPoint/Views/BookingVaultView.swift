@@ -98,7 +98,7 @@ struct BookingVaultView: View {
                 Spacer()
 
                 HStack(spacing: 4) {
-                    Image(systemName: "shield.checkmark.fill")
+                    Image(systemName: "checkmark.shield.fill")
                         .font(.system(size: 9, weight: .bold))
                         .symbolRenderingMode(.hierarchical)
                     Text("Secure Local Storage")

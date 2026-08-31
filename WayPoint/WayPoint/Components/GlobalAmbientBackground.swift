@@ -19,7 +19,7 @@ public struct GlobalAmbientBackground: View {
 
             // Primary Sapphire Accent Orb
             Circle()
-                .fill(WayPointTheme.sapphireAccent.opacity(0.16))
+                .fill(WayPointTheme.sapphireAccent.opacity(0.32))
                 .frame(width: 380, height: 380)
                 .blur(radius: 95)
                 .offset(
@@ -29,7 +29,7 @@ public struct GlobalAmbientBackground: View {
 
             // Secondary Emerald Recovery Orb
             Circle()
-                .fill(WayPointTheme.emeraldRecovery.opacity(0.14))
+                .fill(WayPointTheme.emeraldRecovery.opacity(0.28))
                 .frame(width: 360, height: 360)
                 .blur(radius: 90)
                 .offset(
@@ -39,7 +39,7 @@ public struct GlobalAmbientBackground: View {
 
             // Tertiary Imperial Gold Orb
             Circle()
-                .fill(WayPointTheme.imperialGold.opacity(0.08))
+                .fill(WayPointTheme.imperialGold.opacity(0.22))
                 .frame(width: 320, height: 320)
                 .blur(radius: 85)
                 .offset(

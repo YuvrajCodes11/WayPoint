@@ -80,7 +80,7 @@ struct PaywallView: View {
 
                 // Features List
                 VStack(alignment: .leading, spacing: 14) {
-                    FeatureRow(icon: "shield.checkmark.fill", title: "1-Tap Panic Pivot Recovery", subtitle: "Instant schedule re-balance preserving prepaid hotel & dining passes")
+                    FeatureRow(icon: "checkmark.shield.fill", title: "1-Tap Panic Pivot Recovery", subtitle: "Instant schedule re-balance preserving prepaid hotel & dining passes")
                     FeatureRow(icon: "airplane.circle.fill", title: "Live Flight Radar & Alerts", subtitle: "Real-time Dynamic Island lockscreen notifications for gate changes & delays")
                     FeatureRow(icon: "ticket.fill", title: "Offline Digital Pass Vault", subtitle: "Access boarding passes, hotel vouchers & vector QR codes without roaming data")
                 }

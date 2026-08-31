@@ -170,7 +170,7 @@ struct TripAtRiskCard: View {
                         .fill(WayPointTheme.emeraldRecovery.opacity(0.18))
                         .frame(width: 44, height: 44)
 
-                    Image(systemName: "shield.checkmark.fill")
+                    Image(systemName: "checkmark.shield.fill")
                         .font(.title3.weight(.bold))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(WayPointTheme.emeraldRecovery)

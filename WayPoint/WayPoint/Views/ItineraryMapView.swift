@@ -14,6 +14,7 @@ struct ItineraryMapView: View {
     @State private var position: MapCameraPosition = .automatic
     @State private var locationService = LocationService.shared
     @State private var directionError: String? = nil
+    @State private var routeSheetItem: ItineraryItem? = nil
 
     private var currentDayPlan: DayPlan {
         tripStore.currentDayPlan
@@ -121,6 +122,9 @@ struct ItineraryMapView: View {
             Button("OK", role: .cancel) { directionError = nil }
         } message: {
             Text(directionError ?? "")
+        }
+        .sheet(item: $routeSheetItem) { item in
+            InAppRouteSheet(item: item)
         }
     }
 
@@ -315,30 +319,7 @@ struct ItineraryMapView: View {
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
-
-        guard let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) else {
-            directionError = "Directions are unavailable because this activity has no valid map coordinate."
-            return
-        }
-
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            openMapsToast = "Opening Apple Maps for \(item.title)..."
-        }
-
-        Task {
-            try? await Task.sleep(for: .seconds(3))
-            withAnimation(.easeInOut(duration: 0.3)) {
-                openMapsToast = nil
-            }
-        }
-
-        let clCoord = CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
-        let placemark = MKPlacemark(coordinate: clCoord)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = item.title
-        mapItem.openInMaps(launchOptions: [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking
-        ])
+        routeSheetItem = item
     }
 }
 

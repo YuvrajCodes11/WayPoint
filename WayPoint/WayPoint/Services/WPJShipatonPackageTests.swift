@@ -114,22 +114,31 @@ final class WPJShipatonPackageTests {
 
     // MARK: - Test D: Documentation & Submission Metadata Integrity
     private func testD_DocumentationAndSubmissionMetadataIntegrity() async -> TestResult {
-        let baseDir = "/Users/yuvraj/Documents/WayPoint IOS APP/WayPoint"
+        let candidateDirs = [
+            "/Users/yuvraj/Documents/WayPoint IOS APP/WayPoint",
+            "/Users/yuvraj/Documents/WayPoint IOS APP/WayPoint/WayPoint",
+            Bundle.main.bundlePath
+        ]
         let docFiles = ["README.md", "ARCHITECTURE.md", "DEMO_SCRIPT.md", "APP_STORE_READY.md"]
 
         var allExistAndNonEmpty = true
         var fileDetails: [String] = []
 
         for file in docFiles {
-            let path = "\(baseDir)/\(file)"
-            let exists = FileManager.default.fileExists(atPath: path)
-            var size = 0
-            if exists, let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
-                size = data.count
+            var foundValid = false
+            var maxSizeBytes = 0
+            for dir in candidateDirs {
+                let path = "\(dir)/\(file)"
+                if FileManager.default.fileExists(atPath: path),
+                   let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+                   data.count > 50 {
+                    foundValid = true
+                    maxSizeBytes = data.count
+                    break
+                }
             }
-            let valid = exists && size > 50
-            if !valid { allExistAndNonEmpty = false }
-            fileDetails.append("\(file): \(valid ? "✓ (\(size) bytes)" : "❌")")
+            if !foundValid { allExistAndNonEmpty = false }
+            fileDetails.append("\(file): \(foundValid ? "✓ (\(maxSizeBytes) bytes)" : "❌")")
         }
 
         let subtitleText = "Instant Itinerary Re-balance"

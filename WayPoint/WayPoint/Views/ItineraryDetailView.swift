@@ -12,6 +12,8 @@ struct ItineraryDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    @State private var showInAppRouteSheet: Bool = false
+
     var body: some View {
         ZStack {
             WayPointTheme.oledBackground
@@ -49,6 +51,9 @@ struct ItineraryDetailView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 32)
             }
+        }
+        .sheet(isPresented: $showInAppRouteSheet) {
+            InAppRouteSheet(item: item)
         }
         .preferredColorScheme(.dark)
     }
@@ -204,12 +209,7 @@ struct ItineraryDetailView: View {
     }
 
     private func openInAppleMaps() {
-        let query = item.location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        if let url = URL(string: "http://maps.apple.com/?q=\(query)") {
-            #if canImport(UIKit)
-            UIApplication.shared.open(url)
-            #endif
-        }
+        showInAppRouteSheet = true
     }
 
     // MARK: - Notes Section

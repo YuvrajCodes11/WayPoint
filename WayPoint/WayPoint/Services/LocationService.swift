@@ -21,6 +21,8 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
     private var isGeocoding = false
+    private var geocodeCache: [String: String] = [:]
+    private var lastGeocodedLocation: CLLocation? = nil
 
     override init() {
         super.init()
@@ -90,8 +92,19 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     }
 
     private func reverseGeocode(_ location: CLLocation) {
+        let cacheKey = String(format: "%.4f,%.4f", location.coordinate.latitude, location.coordinate.longitude)
+        if let cached = geocodeCache[cacheKey] {
+            self.currentCityCountry = cached
+            return
+        }
+
+        if let lastLoc = lastGeocodedLocation, location.distance(from: lastLoc) < 100 {
+            return
+        }
+
         guard !isGeocoding else { return }
         isGeocoding = true
+        lastGeocodedLocation = location
 
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             Task { @MainActor in
@@ -101,12 +114,17 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
                 if let placemark = placemarks?.first {
                     let city = placemark.locality ?? placemark.subAdministrativeArea ?? placemark.name
                     let country = placemark.country
+                    var resultStr = ""
                     if let city = city, let country = country {
-                        self.currentCityCountry = "\(city), \(country)"
+                        resultStr = "\(city), \(country)"
                     } else if let city = city {
-                        self.currentCityCountry = city
+                        resultStr = city
                     } else if let country = country {
-                        self.currentCityCountry = country
+                        resultStr = country
+                    }
+                    if !resultStr.isEmpty {
+                        self.currentCityCountry = resultStr
+                        self.geocodeCache[cacheKey] = resultStr
                     }
                 }
             }

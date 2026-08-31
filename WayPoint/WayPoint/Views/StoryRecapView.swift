@@ -181,7 +181,7 @@ struct StoryRecapView: View {
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
                     recapMetricTile(
-                        icon: "shield.checkmark.fill",
+                        icon: "checkmark.shield.fill",
                         label: "RESILIENCE",
                         value: "\(metrics.neutralizedDisruptionsCount) Disruptions Neutralized",
                         color: WayPointTheme.emeraldRecovery
