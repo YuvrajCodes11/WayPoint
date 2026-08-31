@@ -509,7 +509,7 @@ struct PanicPivotSheetView: View {
                     Spacer()
 
                     if newItem.isPreservedReservation {
-                        Text("🔒 Fixed Pass ✓")
+                        Text("Fixed Pass ✓")
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(WayPointTheme.imperialGold)
                     } else {
@@ -574,9 +574,8 @@ struct PanicPivotSheetView: View {
                 Image(systemName: "bolt.fill")
                     .font(.headline.weight(.bold))
 
-                Text("[ ⚡ REBUILD MY DAY ]")
-                    .font(.system(size: 17, weight: .heavy, design: .monospaced))
-                    .tracking(0.8)
+                Text("⚡ Fix My Day Plan")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
@@ -593,8 +592,8 @@ struct PanicPivotSheetView: View {
             .sensoryFeedback(.impact(weight: .heavy), trigger: isRecovered)
         }
         .disabled(pivotResult == nil || isExecuting)
-        .buttonStyle(.plain)
-        .accessibilityLabel("Rebuild My Day Panic Pivot")
+        .buttonStyle(.scalePress)
+        .accessibilityLabel("Fix My Day Plan")
         .accessibilityHint("Applies itinerary re-balance algorithm to neutralize disruptions")
         .accessibilityAddTraits(.isButton)
     }
@@ -603,21 +602,21 @@ struct PanicPivotSheetView: View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
                 Button(action: { dismiss() }) {
-                    Text("[ Done ]")
-                        .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    Text("Done")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(WayPointTheme.emeraldRecovery, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.scalePress)
 
                 Button(action: { showShareSheet = true }) {
                     HStack(spacing: 6) {
                         Image(systemName: "square.and.arrow.up.fill")
                             .font(.caption.weight(.bold))
-                        Text("[ Share Recovery ]")
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        Text("Share Recovery")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(WayPointTheme.sapphireAccent)
                     .frame(maxWidth: .infinity)
@@ -625,7 +624,7 @@ struct PanicPivotSheetView: View {
                     .background(WayPointTheme.sapphireAccent.opacity(0.18), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(WayPointTheme.sapphireAccent.opacity(0.5), lineWidth: 1))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.scalePress)
             }
 
             if undoManager.canUndo(dayID: currentPlan.id) {

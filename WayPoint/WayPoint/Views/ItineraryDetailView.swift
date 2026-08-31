@@ -82,7 +82,7 @@ struct ItineraryDetailView: View {
                         Image(systemName: "lock.shield.fill")
                             .font(.system(size: 9, weight: .bold))
                             .symbolRenderingMode(.hierarchical)
-                        Text("🔒 PROTECTED")
+                        Text("PROTECTED")
                             .font(.system(size: 8.5, weight: .heavy, design: .monospaced))
                     }
                     .foregroundStyle(WayPointTheme.imperialGold)
@@ -100,6 +100,7 @@ struct ItineraryDetailView: View {
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(WayPointTheme.textSecondary)
                 }
+                .buttonStyle(.scalePress)
                 .accessibilityLabel("Close item details")
                 .accessibilityHint("Dismisses the itinerary item detail sheet")
                 .accessibilityAddTraits(.isButton)
@@ -123,17 +124,28 @@ struct ItineraryDetailView: View {
 
                     Spacer()
 
-                    Text("\(item.durationMinutes) min")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(WayPointTheme.textTertiary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(WayPointTheme.cardSurface, in: Capsule())
+                    if item.isCompleted {
+                        Text("✓ Completed & Paid")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(WayPointTheme.emeraldRecovery)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(WayPointTheme.emeraldRecovery.opacity(0.18), in: Capsule())
+                            .overlay(Capsule().strokeBorder(WayPointTheme.emeraldRecovery.opacity(0.4), lineWidth: 1))
+                    } else {
+                        Text("\(item.durationMinutes) min")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(WayPointTheme.textTertiary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(WayPointTheme.cardSurface, in: Capsule())
+                    }
                 }
 
                 Text(item.title)
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundStyle(WayPointTheme.textPrimary)
+                    .strikethrough(item.isCompleted)
                     .lineLimit(nil)
                     .minimumScaleFactor(0.8)
 
@@ -171,7 +183,32 @@ struct ItineraryDetailView: View {
                 }
 
                 Spacer()
+
+                Button(action: openInAppleMaps) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                            .font(.caption.weight(.bold))
+                            .symbolRenderingMode(.hierarchical)
+                        Text("Maps")
+                            .font(.caption.weight(.bold))
+                    }
+                    .foregroundStyle(WayPointTheme.sapphireAccent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(WayPointTheme.sapphireAccent.opacity(0.18), in: Capsule())
+                    .overlay(Capsule().strokeBorder(WayPointTheme.sapphireAccent.opacity(0.4), lineWidth: 1))
+                }
+                .buttonStyle(.scalePress)
             }
+        }
+    }
+
+    private func openInAppleMaps() {
+        let query = item.location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        if let url = URL(string: "http://maps.apple.com/?q=\(query)") {
+            #if canImport(UIKit)
+            UIApplication.shared.open(url)
+            #endif
         }
     }
 
@@ -284,12 +321,11 @@ struct ItineraryDetailView: View {
             .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
             .sensoryFeedback(.impact(weight: .medium), trigger: item.isCompleted)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.scalePress)
         .accessibilityLabel("Confirm Pass Reservation for \(totalStr) with Apple Pay")
         .accessibilityHint("Double tap to confirm reservation and mark activity complete")
         .accessibilityAddTraits(.isButton)
     }
-
 
     private func executeApplePayBooking() {
         #if canImport(UIKit)
@@ -310,35 +346,40 @@ struct ItineraryDetailView: View {
         Button(action: toggleCompletion) {
             HStack(spacing: 10) {
                 Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
+                    .font(.title3.weight(.bold))
 
-                Text(item.isCompleted ? "Completed" : "Mark as Completed")
-                    .font(.headline.weight(.bold))
+                Text(item.isCompleted ? "Mark as Pending" : "Mark as Paid & Completed")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
             }
-            .foregroundColor(item.isCompleted ? .white : .black)
+            .foregroundColor(item.isCompleted ? WayPointTheme.textSecondary : .white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background {
                 if item.isCompleted {
-                    WayPointTheme.obsidianElevated
+                    WayPointTheme.cardSurface
                 } else {
-                    WayPointTheme.accentGradient
+                    LinearGradient(
+                        colors: [WayPointTheme.emeraldRecovery, WayPointTheme.sapphireAccent],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(
-                        item.isCompleted ? WayPointTheme.violetGlow.opacity(0.6) : Color.clear,
+                        item.isCompleted ? WayPointTheme.hairlineStroke : Color.clear,
                         lineWidth: 1
                     )
             )
             .shadow(
-                color: (item.isCompleted ? WayPointTheme.violetGlow : WayPointTheme.cyanGlow).opacity(0.3),
+                color: item.isCompleted ? Color.clear : WayPointTheme.emeraldRecovery.opacity(0.4),
                 radius: 12, x: 0, y: 6
             )
         }
-        .accessibilityLabel(item.isCompleted ? "Mark incomplete" : "Mark as completed")
+        .buttonStyle(.scalePress)
+        .accessibilityLabel(item.isCompleted ? "Mark as Pending" : "Mark as Paid & Completed")
         .accessibilityValue(item.isCompleted ? "Completed" : "Not completed")
         .accessibilityAddTraits(.isButton)
     }

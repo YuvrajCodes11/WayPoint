@@ -253,7 +253,7 @@ private struct BookingCardView: View {
                         Image(systemName: "lock.shield.fill")
                             .font(.system(size: 8, weight: .bold))
                             .symbolRenderingMode(.hierarchical)
-                        Text("🔒 PROTECTED")
+                        Text("PROTECTED")
                             .font(.system(size: 8.5, weight: .heavy, design: .monospaced))
                     }
                     .padding(.horizontal, 8)

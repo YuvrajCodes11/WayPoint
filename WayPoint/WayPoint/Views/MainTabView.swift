@@ -41,22 +41,8 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Layer 1: Persistent 3D Canvas (Never reset or unmounted on tab change)
-            #if canImport(WebKit) && canImport(UIKit)
-            SplineWebContainer(urlString: "https://my.spline.design/iridescenttorusanimation-34cvLNege0W70WxpEm6Aml6d/")
-                .id("persistent_spline_canvas")
-                .scaleEffect(1.08)
-                .padding(.bottom, -35)
-                .clipped()
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .compositingGroup()
-            #else
-            WayPointTheme.obsidian.ignoresSafeArea()
-            #endif
-
-            Color.black.opacity(0.18)
-                .ignoresSafeArea()
+            // Layer 1: Persistent Global Ambient Background (Consistently renders across all tabs)
+            GlobalAmbientBackground()
 
             // Layer 2: Persistent ZStack Tab Views (All child views stay mounted)
             ZStack {

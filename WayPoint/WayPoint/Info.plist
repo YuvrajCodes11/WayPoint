@@ -2,11 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>WayPoint needs camera access to scan physical travel receipts, tickets, and booking QR codes.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>WayPoint uses your location to calculate transit travel times and alert you to real-time weather disruptions.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>WayPoint uses your location to calculate transit travel times and alert you to real-time weather disruptions.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>WayPoint uses your location to calculate transit travel times and alert you to real-time weather disruptions.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>WayPoint needs access to your photos to import receipt screenshots for expense logging.</string>

@@ -236,24 +236,7 @@ struct HomeView: View {
     // MARK: - Background
 
     private var backgroundLayer: some View {
-        ZStack {
-            WayPointTheme.obsidian.ignoresSafeArea()
-
-            Circle()
-                .fill(WayPointTheme.cyanGlow.opacity(0.12))
-                .frame(width: 380, height: 380)
-                .blur(radius: 90)
-                .offset(x: -120, y: -280)
-
-            Circle()
-                .fill(WayPointTheme.violetGlow.opacity(0.12))
-                .frame(width: 400, height: 400)
-                .blur(radius: 100)
-                .offset(x: 140, y: 120)
-        }
-        .ignoresSafeArea()
-        .drawingGroup()
-        .accessibilityHidden(true)
+        GlobalAmbientBackground()
     }
 
     private var displayTravelerName: String {
@@ -441,7 +424,7 @@ struct HomeView: View {
 
     private var daySelectorSection: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 ForEach(Array(trip.days.enumerated()), id: \.element.id) { index, day in
                     Button(action: {
                         #if canImport(UIKit)
@@ -451,53 +434,46 @@ struct HomeView: View {
                             tripStore.selectDay(index)
                         }
                     }) {
-                        VStack(spacing: 2) {
+                        HStack(spacing: 6) {
                             Text("Day \(index + 1)")
-                                .font(.caption2.weight(.bold))
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .foregroundStyle(
-                                    trip.selectedDayIndex == index
-                                        ? WayPointTheme.cyanGlow
-                                        : WayPointTheme.textTertiary
-                                )
+                                .font(.caption.weight(.bold))
 
-                            Text(formattedDayTitle(for: day, index: index))
-                                .font(.caption.weight(.semibold))
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .foregroundStyle(
-                                    trip.selectedDayIndex == index
-                                        ? WayPointTheme.textPrimary
-                                        : WayPointTheme.textSecondary
-                                )
+                            if trip.selectedDayIndex == index {
+                                Circle()
+                                    .fill(WayPointTheme.sapphireAccent)
+                                    .frame(width: 5, height: 5)
+                            }
                         }
-                        .frame(maxWidth: 180)
+                        .foregroundStyle(
+                            trip.selectedDayIndex == index
+                                ? WayPointTheme.sapphireAccent
+                                : WayPointTheme.textSecondary
+                        )
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(
                             trip.selectedDayIndex == index
-                                ? WayPointTheme.cyanGlow.opacity(0.18)
-                                : WayPointTheme.obsidianElevated,
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                ? WayPointTheme.sapphireAccent.opacity(0.18)
+                                : WayPointTheme.cardSurface,
+                            in: Capsule()
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            Capsule()
                                 .strokeBorder(
                                     trip.selectedDayIndex == index
-                                        ? WayPointTheme.cyanGlow.opacity(0.6)
-                                        : WayPointTheme.glassBorder,
+                                        ? WayPointTheme.sapphireAccent
+                                        : WayPointTheme.hairlineStroke,
                                     lineWidth: 1
                                 )
                         )
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Day \(index + 1): \(formattedDayTitle(for: day, index: index))")
+                    .buttonStyle(.scalePress)
+                    .accessibilityLabel("Day \(index + 1)")
                     .accessibilityHint(trip.selectedDayIndex == index ? "Currently active day plan" : "Double tap to view Day \(index + 1) schedule")
                     .accessibilityAddTraits(trip.selectedDayIndex == index ? [.isSelected, .isButton] : [.isButton])
                 }
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
             .padding(.vertical, 4)
         }
     }
@@ -703,38 +679,73 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Floating Action Button (FAB)
+    // MARK: - Floating Action Bar
 
     private var floatingRecalculateFAB: some View {
-        Button(action: {
-            showRecalculateSheet = true
-        }) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(.black)
-                    .rotationEffect(.degrees(aiService.isRecalculating ? 360 : 0))
-                    .animation(
-                        aiService.isRecalculating
-                            ? (reduceMotion ? .easeInOut(duration: 0.15) : .linear(duration: 1.2).repeatForever(autoreverses: false))
-                            : .default,
-                        value: aiService.isRecalculating
-                    )
+        let isDisrupted = (trip.selectedDayIndex == 0 && activeDisruption != nil)
 
-                Text(aiService.isRecalculating ? "Re-balancing..." : "AI Re-balance Itinerary")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.black)
+        return Group {
+            if isDisrupted {
+                Button(action: {
+                    showRecalculateSheet = true
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.fill")
+                            .font(.body.weight(.bold))
+
+                        Text("⚡ Fix My Day Plan")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(
+                            colors: [WayPointTheme.crimsonAlert, WayPointTheme.imperialGold],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: Capsule()
+                    )
+                    .shadow(color: WayPointTheme.crimsonAlert.opacity(0.4), radius: 12, x: 0, y: 4)
+                }
+                .buttonStyle(.scalePress)
+                .accessibilityLabel("Fix My Day Plan")
+                .accessibilityHint("Opens panic pivot sheet to resolve schedule disruption")
+            } else {
+                Button(action: {
+                    showRecalculateSheet = true
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(WayPointTheme.emeraldRecovery)
+
+                        Text("✓ Trip is Optimized")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(WayPointTheme.textPrimary)
+
+                        Spacer()
+
+                        Text("Re-balance")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(WayPointTheme.sapphireAccent)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(WayPointTheme.sapphireAccent.opacity(0.18), in: Capsule())
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(WayPointTheme.cardSurface, in: Capsule())
+                    .overlay(Capsule().strokeBorder(WayPointTheme.emeraldRecovery.opacity(0.4), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 4)
+                }
+                .buttonStyle(.scalePress)
+                .accessibilityLabel("Trip is Optimized")
+                .accessibilityHint("Double tap to re-balance schedule")
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(WayPointTheme.accentGradient, in: Capsule())
-            .shadow(color: WayPointTheme.cyanGlow.opacity(0.5), radius: 12, x: 0, y: 4)
-            .shadow(color: WayPointTheme.violetGlow.opacity(0.3), radius: 18, x: 0, y: 6)
         }
-        .contentShape(Capsule())
-        .buttonStyle(.plain)
-        .accessibilityLabel("AI Re-balance Itinerary")
-        .accessibilityHint("Recalculates your schedule for weather or delays")
+        .padding(.horizontal, 24)
     }
 
     // MARK: - Helper Actions & Bindings
@@ -786,31 +797,29 @@ private struct TimelineCard: View {
             GlassCardView(
                 cornerRadius: 18,
                 padding: 14,
-                glowColor: item.isCompleted ? WayPointTheme.violetGlow : WayPointTheme.cyanGlow
+                glowColor: item.isCompleted ? WayPointTheme.emeraldRecovery : WayPointTheme.sapphireAccent
             ) {
                 VStack(alignment: .leading, spacing: 12) {
-                    // Header Row: Time range + Weather Pill + Checkmark
+                    // Header Row: Time range + Indoor Pill + Protected Pill + Checkmark
                     HStack(alignment: .center) {
                         HStack(spacing: 6) {
                             Text(item.timeRange)
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(WayPointTheme.cyanGlow)
+                                .foregroundStyle(WayPointTheme.sapphireAccent)
 
-                            // Weather / Indoor Status Tag
                             Text(item.isIndoor ? "🏛️ Indoor" : "☀️ Outdoor")
                                 .font(.system(size: 10, weight: .semibold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(WayPointTheme.obsidianSurface, in: Capsule())
+                                .background(WayPointTheme.cardSurface, in: Capsule())
                                 .foregroundStyle(WayPointTheme.textSecondary)
 
-                            // Protected Reservation Pill Badge
                             if item.isPreservedReservation {
                                 HStack(spacing: 3) {
                                     Image(systemName: "lock.shield.fill")
                                         .font(.system(size: 9, weight: .bold))
                                         .symbolRenderingMode(.hierarchical)
-                                    Text("🔒 PROTECTED")
+                                    Text("PROTECTED")
                                         .font(.system(size: 8.5, weight: .heavy, design: .monospaced))
                                 }
                                 .foregroundStyle(WayPointTheme.imperialGold)
@@ -823,94 +832,110 @@ private struct TimelineCard: View {
 
                         Spacer()
 
-
                         Button(action: onToggleComplete) {
                             Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
                                 .font(.title3)
                                 .foregroundStyle(
                                     item.isCompleted
-                                        ? WayPointTheme.violetGlow
+                                        ? WayPointTheme.emeraldRecovery
                                         : WayPointTheme.textTertiary
                                 )
                                 .symbolEffect(.bounce, value: item.isCompleted)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(item.isCompleted ? "Mark incomplete" : "Mark complete")
-                        .accessibilityValue(item.isCompleted ? "Completed" : "Not completed")
                         .accessibilityAddTraits(.isButton)
                     }
 
                     // Content Row: Thumbnail Image + Details
-                    HStack(alignment: .top, spacing: 12) {
-                        thumbnailImageView
+                    Button(action: onTap) {
+                        HStack(alignment: .top, spacing: 12) {
+                            thumbnailImageView
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.title)
-                                .font(.headline.weight(.bold))
-                                .foregroundStyle(WayPointTheme.textPrimary)
-                                .lineLimit(2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.title)
+                                    .font(.headline.weight(.bold))
+                                    .foregroundStyle(WayPointTheme.textPrimary)
+                                    .strikethrough(item.isCompleted)
+                                    .lineLimit(2)
 
-                            Text(item.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(WayPointTheme.textSecondary)
-                                .lineLimit(2)
+                                Text(item.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(WayPointTheme.textSecondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
                         }
                     }
+                    .buttonStyle(.scalePress)
 
-                    // Footer Row: Rating Pill + Category/Price Tag + Ghost Badge
+                    // Footer Metadata Row: Left (Star Rating + Category) | Right (Price + Apple Maps Directions)
                     HStack(spacing: 8) {
-                        // Rating Pill
-                        HStack(spacing: 3) {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color.orange)
+                        // Left side: Rating & Category
+                        HStack(spacing: 6) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Color.orange)
 
-                            Text(item.formattedRatingAndReviews.dropFirst(2))
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(WayPointTheme.textPrimary)
+                                Text(String(format: "%.1f", item.rating))
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(WayPointTheme.textPrimary)
+                            }
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3.5)
+                            .background(Color.orange.opacity(0.15), in: Capsule())
+
+                            Text(item.category.displayName)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(WayPointTheme.textSecondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3.5)
+                                .background(WayPointTheme.cardSurface, in: Capsule())
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.15), in: Capsule())
-
-                        // Category & Price Tier Tag
-                        Text(item.categoryAndPriceTag)
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(WayPointTheme.textSecondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(WayPointTheme.obsidianElevated, in: Capsule())
 
                         Spacer()
 
-                        // Ghost Alternatives Badge Pill
-                        if !item.ghostAlternatives.isEmpty {
-                            HStack(spacing: 3) {
-                                Text("👻 \(item.ghostAlternatives.count) Ghost")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(WayPointTheme.cyanGlow)
+                        // Right side: Price & Apple Maps Button
+                        HStack(spacing: 6) {
+                            Text(item.priceTier)
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(WayPointTheme.emeraldRecovery)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3.5)
+                                .background(WayPointTheme.emeraldRecovery.opacity(0.15), in: Capsule())
+
+                            Button(action: { openInAppleMaps(for: item) }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                                        .font(.caption.weight(.bold))
+                                        .symbolRenderingMode(.hierarchical)
+                                    Text("Maps")
+                                        .font(.caption2.weight(.bold))
+                                }
+                                .foregroundStyle(WayPointTheme.sapphireAccent)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3.5)
+                                .background(WayPointTheme.sapphireAccent.opacity(0.18), in: Capsule())
+                                .overlay(Capsule().strokeBorder(WayPointTheme.sapphireAccent.opacity(0.4), lineWidth: 1))
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(WayPointTheme.cyanGlow.opacity(0.15), in: Capsule())
-                            .overlay(Capsule().strokeBorder(WayPointTheme.cyanGlow.opacity(0.4), lineWidth: 1))
+                            .buttonStyle(.scalePress)
                         }
                     }
                 }
             }
-            .compositingGroup()
-            .scaleEffect(isPressed ? 0.97 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
             .opacity(item.isCompleted ? 0.72 : 1.0)
-            .onTapGesture {
-                isPressed = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    isPressed = false
-                    onTap()
-                }
-            }
         }
         .padding(.bottom, isLast ? 0 : 12)
+    }
+
+    private func openInAppleMaps(for item: ItineraryItem) {
+        let query = item.location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        if let url = URL(string: "http://maps.apple.com/?q=\(query)") {
+            #if canImport(UIKit)
+            UIApplication.shared.open(url)
+            #endif
+        }
     }
 
     private var thumbnailImageView: some View {

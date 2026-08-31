@@ -285,7 +285,7 @@ struct StoryRecapView: View {
             )
             .shadow(color: WayPointTheme.emeraldRecovery.opacity(0.4), radius: 12, x: 0, y: 5)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.scalePress)
         .accessibilityLabel("Share Travel Pulse Story")
         .accessibilityHint("Opens native iOS Share Sheet to export your travel recap story card")
     }
