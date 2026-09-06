@@ -1,0 +1,16 @@
+# Xcode & Build Artifacts
+.DS_Store
+build/
+DerivedData/
+.build-*/
+.build-cache/
+.build-derived*/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserdatad
+.vscode/
+
+# Private API Keys (if any exist)
+Secrets.plist
+.env

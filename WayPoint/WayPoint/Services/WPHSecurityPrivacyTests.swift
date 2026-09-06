@@ -70,6 +70,9 @@ final class WPHSecurityPrivacyTests {
     // MARK: - Test B: Keychain Token Security
     private func testB_KeychainTokenSecurity() async -> TestResult {
         let service = SupabaseService.shared
+        let originalSession = service.loadAuthSession()
+        let originalGuestActive = UserDefaults.standard.bool(forKey: "app.waypoint.guest_demo_active")
+
         let testSession = AuthSession(
             userID: "test_sec_user_123",
             email: "security_test@waypoint.app",
@@ -85,10 +88,19 @@ final class WPHSecurityPrivacyTests {
         let loadedSession = service.loadAuthSession()
         let storedSecurely = (loadedSession?.sessionToken == testSession.sessionToken && loadedSession?.userID == testSession.userID)
 
-        // Clear session (Sign out)
+        // Clear session (Sign out test)
         service.clearKeychainSession()
         let purgedSession = service.loadAuthSession()
         let purgedFromKeychain = (purgedSession == nil)
+
+        // Restore original active session state if present
+        if let original = originalSession {
+            service.saveAuthSession(original)
+        }
+        if originalGuestActive {
+            UserDefaults.standard.set(true, forKey: "app.waypoint.guest_demo_active")
+            service.checkInitialSession()
+        }
 
         let passed = storedSecurely && purgedFromKeychain
 

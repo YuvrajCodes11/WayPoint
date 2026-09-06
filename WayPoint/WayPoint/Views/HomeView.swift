@@ -86,6 +86,7 @@ struct HomeView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
             }
+            .scrollContentBackground(.hidden)
             .safeAreaInset(edge: .top) {
                 VStack(spacing: 8) {
 #if DEBUG
@@ -117,9 +118,10 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             floatingRecalculateFAB
-                .padding(.bottom, 92)
+                .padding(.bottom, 80)
                 .allowsHitTesting(true)
         }
+        .background(Color.clear)
         .preferredColorScheme(.dark)
         .task { await tripStore.loadRemoteTripIfNoLocalState() }
         .sheet(isPresented: $showPaywall) {
@@ -240,7 +242,7 @@ struct HomeView: View {
     // MARK: - Background
 
     private var backgroundLayer: some View {
-        GlobalAmbientBackground()
+        Color.clear
     }
 
     private var displayTravelerName: String {
@@ -270,7 +272,8 @@ struct HomeView: View {
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundStyle(WayPointTheme.textPrimary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                        .minimumScaleFactor(0.8)
+                        .layoutPriority(1)
 
                     HStack(spacing: 4) {
                         Image(systemName: "mappin.and.ellipse")
@@ -284,33 +287,21 @@ struct HomeView: View {
                 Spacer()
 
                 HStack(spacing: 6) {
+                    liveActivityPill
+
                     Button(action: { showSocialImportSheet = true }) {
                         HStack(spacing: 3) {
                             Image(systemName: "link.badge.plus")
                                 .font(.caption2.weight(.bold))
                             Text("IMPORT")
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .lineLimit(1)
                         }
                         .foregroundStyle(WayPointTheme.sapphireAccent)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 7)
                         .background(WayPointTheme.sapphireAccent.opacity(0.18), in: Capsule())
                         .overlay(Capsule().strokeBorder(WayPointTheme.sapphireAccent.opacity(0.4), lineWidth: 1))
-                    }
-                    .buttonStyle(.scalePress)
-
-                    Button(action: { showSharePulseSheet = true }) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "square.and.arrow.up.fill")
-                                .font(.caption2.weight(.bold))
-                            Text("SHARE")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        }
-                        .foregroundStyle(WayPointTheme.emeraldRecovery)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 7)
-                        .background(WayPointTheme.emeraldRecovery.opacity(0.18), in: Capsule())
-                        .overlay(Capsule().strokeBorder(WayPointTheme.emeraldRecovery.opacity(0.4), lineWidth: 1))
                     }
                     .buttonStyle(.scalePress)
 
@@ -327,7 +318,7 @@ struct HomeView: View {
                     Circle()
                         .fill(Color.green)
                         .frame(width: 8, height: 8)
-                    Text("LIVE RADAR ACTIVE ON DYNAMIC ISLAND")
+                    Text(DeviceHardware.liveActivityDisplayLabel)
                         .font(.system(size: 9.5, weight: .heavy, design: .monospaced))
                         .foregroundStyle(Color.green)
                 }

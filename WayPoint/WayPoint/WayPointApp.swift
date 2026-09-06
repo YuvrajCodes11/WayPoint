@@ -13,29 +13,31 @@ struct WayPointApp: App {
     @State private var aiService = AIRecalculatorService.shared
     @State private var tripStore = TripStore.shared
 
-    @State private var showSplash = true
+    @State private var isSplashTimerActive = true
+
+    private var appStage: RootViewStage {
+        if isSplashTimerActive || supabaseService.appStage == .splash {
+            return .splash
+        }
+        return supabaseService.appStage
+    }
 
     var body: some Scene {
         WindowGroup {
             ZStack {
-                if showSplash {
+                switch appStage {
+                case .splash:
                     LaunchScreenView()
-                        .transition(.opacity.animation(.easeInOut(duration: 0.35)))
-                        .zIndex(2)
-                } else {
-                    Group {
-                        if supabaseService.isAuthenticated {
-                            MainTabView()
-                                .transition(.opacity.combined(with: .scale(scale: 1.05)))
-                        } else {
-                            OnboardingView()
-                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                        }
-                    }
-                    .zIndex(1)
+                        .transition(.opacity)
+                case .unauthenticated:
+                    OnboardingView()
+                        .transition(.opacity)
+                case .authenticated:
+                    MainTabView()
+                        .transition(.opacity)
                 }
             }
-            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: supabaseService.isAuthenticated)
+            .animation(.easeInOut(duration: 0.25), value: appStage)
             .environment(subscriptionManager)
             .environment(supabaseService)
             .environment(notificationManager)
@@ -43,9 +45,9 @@ struct WayPointApp: App {
             .environment(tripStore)
             .preferredColorScheme(.dark)
             .task {
-                try? await Task.sleep(for: .milliseconds(1400))
-                withAnimation(.easeInOut(duration: 0.35)) {
-                    showSplash = false
+                try? await Task.sleep(for: .milliseconds(800))
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isSplashTimerActive = false
                 }
                 #if DEBUG
                 _ = await WPACoreDataIntegrityTests.shared.runAllWPATests()

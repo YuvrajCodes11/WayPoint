@@ -8,6 +8,18 @@ import Observation
 import Security
 import Supabase
 
+public enum RootViewStage: Equatable {
+    case splash
+    case authenticated
+    case unauthenticated
+}
+
+public enum AuthStatus: Equatable {
+    case checkingSession
+    case authenticated
+    case unauthenticated
+}
+
 typealias SupabaseManager = SupabaseService
 
 @MainActor
@@ -24,6 +36,8 @@ class SupabaseService {
     )
 
     var isAuthenticated: Bool = false
+    var authStatus: AuthStatus = .checkingSession
+    var appStage: RootViewStage = .splash
     var authState: AuthState = .unauthenticated
     private(set) var currentSession: AuthSession? = nil
     var currentUserEmail: String? = nil
@@ -49,30 +63,59 @@ class SupabaseService {
     }
 
     init() {
-        // Restore persistent session token from iOS Keychain on startup with expiration check
+        checkInitialSession()
+    }
+
+    /// Synchronously validates Keychain session or Guest/Demo flag on app startup.
+    func checkInitialSession() {
         if let session = loadAuthSession() {
             if session.isExpired {
                 print("[SupabaseService] Stored auth session expired at \(session.expiresAt). Requiring re-authentication.")
                 clearKeychainSession()
                 self.authState = .unauthenticated
                 self.isAuthenticated = false
+                self.authStatus = .unauthenticated
+                self.appStage = .unauthenticated
                 self.currentUserEmail = nil
             } else {
                 self.currentSession = session
                 self.authState = .authenticated(userID: session.userID, email: session.email)
                 self.isAuthenticated = true
+                self.authStatus = .authenticated
+                self.appStage = .authenticated
                 self.currentUserEmail = session.email ?? "guest@waypoint.ai"
             }
         } else if let savedEmail = loadSessionFromKeychain() {
             let mockID = "user_" + String(abs(savedEmail.lowercased().hashValue))
             self.authState = .authenticated(userID: mockID, email: savedEmail)
             self.isAuthenticated = true
+            self.authStatus = .authenticated
+            self.appStage = .authenticated
             self.currentUserEmail = savedEmail
-        } else {
+        } else if UserDefaults.standard.bool(forKey: "app.waypoint.guest_demo_active") {
             self.authState = .authenticated(userID: "guest_user", email: "guest@waypoint.ai")
             self.isAuthenticated = true
+            self.authStatus = .authenticated
+            self.appStage = .authenticated
             self.currentUserEmail = "guest@waypoint.ai"
+        } else {
+            self.authState = .unauthenticated
+            self.isAuthenticated = false
+            self.authStatus = .unauthenticated
+            self.appStage = .unauthenticated
+            self.currentUserEmail = nil
         }
+    }
+
+    /// Sign in cleanly as a demo/guest user with persistent flag.
+    func signInAsGuest() {
+        UserDefaults.standard.set(true, forKey: "app.waypoint.guest_demo_active")
+        self.authState = .authenticated(userID: "guest_user", email: "guest@waypoint.ai")
+        self.isAuthenticated = true
+        self.authStatus = .authenticated
+        self.appStage = .authenticated
+        self.currentUserEmail = "guest@waypoint.ai"
+        TripStore.shared.handleUserSignIn(userID: "guest_user")
     }
 
     /// Validates current session token expiration and updates authState accordingly.
@@ -124,9 +167,12 @@ class SupabaseService {
 
         saveAuthSession(session)
         saveSessionToKeychain(email: trimmedEmail)
+        UserDefaults.standard.set(true, forKey: "app.waypoint.guest_demo_active")
         currentSession = session
         currentUserEmail = trimmedEmail
         isAuthenticated = true
+        authStatus = .authenticated
+        appStage = .authenticated
         authState = .authenticated(userID: userID, email: trimmedEmail)
 
         TripStore.shared.handleUserSignIn(userID: userID)
@@ -217,6 +263,8 @@ class SupabaseService {
         currentSession = nil
         authState = .unauthenticated
         isAuthenticated = false
+        authStatus = .unauthenticated
+        appStage = .unauthenticated
         currentUserEmail = nil
         pendingEmailOrPhone = nil
         isOTPRequested = false
@@ -286,6 +334,8 @@ class SupabaseService {
         currentSession = nil
         authState = .unauthenticated
         isAuthenticated = false
+        authStatus = .unauthenticated
+        appStage = .unauthenticated
         currentUserEmail = nil
     }
 
@@ -533,6 +583,7 @@ class SupabaseService {
 
     func clearKeychainSession() {
         UserDefaults.standard.removeObject(forKey: authSessionKeychainKey)
+        UserDefaults.standard.removeObject(forKey: "app.waypoint.guest_demo_active")
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: authSessionKeychainKey,

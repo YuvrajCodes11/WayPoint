@@ -200,22 +200,40 @@ struct OnboardingView: View {
     // MARK: - Primary Action Button
 
     private var actionButton: some View {
-        Button(action: { showAuthSheet = true }) {
-            HStack(spacing: 10) {
-                Image(systemName: "arrow.right.circle.fill")
-                    .font(.title3.weight(.semibold))
+        VStack(spacing: 12) {
+            Button(action: { showAuthSheet = true }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.title3.weight(.semibold))
 
-                Text("Get Started with Phone / Email")
-                    .font(.headline.weight(.bold))
+                    Text("Get Started with Phone / Email")
+                        .font(.headline.weight(.bold))
+                }
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(WayPointTheme.accentGradient)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: WayPointTheme.cyanGlow.opacity(0.4), radius: 14, x: 0, y: 6)
             }
-            .foregroundColor(.black)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(WayPointTheme.accentGradient)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: WayPointTheme.cyanGlow.opacity(0.4), radius: 14, x: 0, y: 6)
+            .buttonStyle(.plain)
+
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    supabaseService.signInAsGuest()
+                }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.caption.weight(.bold))
+                    Text("Explore Demo Mode")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(WayPointTheme.textSecondary)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 }
 

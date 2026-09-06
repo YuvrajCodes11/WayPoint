@@ -52,10 +52,6 @@ struct BookingVaultView: View {
 
     var body: some View {
         ZStack {
-            WayPointTheme.oledBackground
-                .ignoresSafeArea()
-                .accessibilityHidden(true)
-
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
                     headerSection
@@ -66,7 +62,9 @@ struct BookingVaultView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 100)
             }
+            .scrollContentBackground(.hidden)
         }
+        .background(Color.clear)
         .preferredColorScheme(.dark)
         .onAppear {
             if tripStore.userBookings.isEmpty {

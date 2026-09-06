@@ -17,9 +17,6 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack {
-            WayPointTheme.obsidian.opacity(0.72)
-                .ignoresSafeArea()
-
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
                     headerSection
@@ -33,7 +30,9 @@ struct SettingsView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 100)
             }
+            .scrollContentBackground(.hidden)
         }
+        .background(Color.clear)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showPaywall) {
             PaywallView()

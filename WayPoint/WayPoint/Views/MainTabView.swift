@@ -39,6 +39,16 @@ enum AppTab: Int, CaseIterable, Identifiable {
 struct MainTabView: View {
     @State private var selectedTab: AppTab = .dashboard
 
+    init() {
+        #if canImport(UIKit)
+        let appearance = UITabBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = .clear
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+        #endif
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Layer 1: Persistent Global Ambient Background (Consistently renders across all tabs)

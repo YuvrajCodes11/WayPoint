@@ -15,7 +15,7 @@ struct ItineraryMapView: View {
     @State private var position: MapCameraPosition = .automatic
     @State private var locationService = LocationService.shared
     @State private var directionError: String? = nil
-    @State private var routeSheetItem: ItineraryItem? = nil
+    @State private var activeRouteStop: ItineraryItem? = nil
     @State private var openMapsToast: String? = nil
 
     private var currentDayPlan: DayPlan {
@@ -96,15 +96,18 @@ struct ItineraryMapView: View {
             }
             .allowsHitTesting(false)
 
-            // Layer 3: Synchronized Paging Carousel Overlay
+            // Layer 3: Synchronized Paging Carousel Overlay (Prevent MapKit Touch Hijacking)
             VStack {
                 Spacer()
                 pagingCardCarousel
                     .padding(.bottom, 95)
                     .allowsHitTesting(true)
             }
-            .allowsHitTesting(false)
+            .allowsHitTesting(true)
+            .zIndex(100)
         }
+        .background(Color.clear)
+        .scrollContentBackground(.hidden)
         .preferredColorScheme(.dark)
         .onAppear {
             if selectedItem == nil, let first = currentDayPlan.items.first {
@@ -135,7 +138,7 @@ struct ItineraryMapView: View {
         } message: {
             Text(directionError ?? "")
         }
-        .sheet(item: $routeSheetItem) { item in
+        .sheet(item: $activeRouteStop) { item in
             InAppRouteSheet(item: item)
         }
     }
@@ -143,7 +146,7 @@ struct ItineraryMapView: View {
     // MARK: - Top Header Overlay
 
     private var topHeaderOverlay: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("GPS RADAR & MAP")
                     .font(.system(size: 9.5, weight: .bold, design: .monospaced))
@@ -154,9 +157,10 @@ struct ItineraryMapView: View {
                     .font(.headline.weight(.bold))
                     .foregroundStyle(WayPointTheme.textPrimary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             Menu {
                 ForEach(Array(tripStore.activeTrip.days.enumerated()), id: \.element.id) { index, day in
@@ -186,6 +190,7 @@ struct ItineraryMapView: View {
                 .shadow(color: WayPointTheme.sapphireAccent.opacity(0.4), radius: 8, x: 0, y: 3)
             }
             .buttonStyle(.scalePress)
+            .fixedSize()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -250,7 +255,7 @@ struct ItineraryMapView: View {
                     Spacer(minLength: 8)
 
                     Button(action: {
-                        routeSheetItem = item
+                        activeRouteStop = item
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
