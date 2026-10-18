@@ -1,0 +1,71 @@
+{
+  "identifier" : "WayPointProductsConfig",
+  "nonRenewingSubscriptions" : [ ],
+  "products" : [
+    {
+      "displayPrice" : "14.99",
+      "familyShareable" : true,
+      "internalID" : "waypoint_pro_lifetime",
+      "localizations" : [
+        {
+          "description" : "Unlimited Lifetime Pass to all WayPoint Pro features",
+          "displayName" : "WayPoint Lifetime Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "waypoint_pro_lifetime",
+      "referenceName" : "Lifetime Pro",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [ ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "WayPointProGroup",
+      "localizations" : [
+        {
+          "description" : "Access all WayPoint Pro travel planning features.",
+          "displayName" : "WayPoint Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "WayPoint Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "waypoint_pro_monthly",
+          "introductoryOffer" : {
+            "internalID" : "intro_monthly_7d_trial",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P7D"
+          },
+          "localizations" : [
+            {
+              "description" : "Monthly Pro Access with 7-day Free Trial",
+              "displayName" : "WayPoint Monthly Pro",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "waypoint_pro_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Monthly Pro",
+          "subscriptionGroupID" : "WayPointProGroup",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

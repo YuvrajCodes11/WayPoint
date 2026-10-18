@@ -2,12 +2,14 @@
 //  SubscriptionManager.swift
 //  WayPoint
 //
-//  Task 4.1 / WP4: Unified Subscription Manager & Entitlement Engine
+//  Task 4.1 / WP4: Production RevenueCat & StoreKit 2 Unified Subscription Engine
 //
 
 import SwiftUI
+import Combine
 import StoreKit
 import RevenueCat
+import RevenueCatUI
 
 public struct ProEntitlementCache: Codable, Equatable {
     public let isPro: Bool
@@ -21,182 +23,120 @@ public struct ProEntitlementCache: Codable, Equatable {
     }
 }
 
-@MainActor
 @Observable
-final class SubscriptionManager: NSObject, PurchasesDelegate {
-    static let shared = SubscriptionManager()
+@MainActor
+public final class SubscriptionManager: NSObject, ObservableObject, PurchasesDelegate {
+    public static let shared = SubscriptionManager()
 
     private let entitlementCacheKey = "waypoint_pro_entitlement_v1"
+    private let keychainProKey = "waypoint_is_pro_user_keychain_cache"
 
-    var isProMember: Bool = false {
+    public var isPro: Bool = false {
         didSet {
-            if isProMember != oldValue {
-                saveEntitlementCache(isPro: isProMember)
+            if isPro != oldValue {
+                saveEntitlementCache(isPro: isPro)
             }
         }
     }
-    var isLoading: Bool = false
-    var currentOffering: Offering? = nil
-    var errorMessage: String? = nil
-    private(set) var isConfigured: Bool = false
+    public var offerings: Offerings? = nil
+    public var isLoading: Bool = false
+    public var errorMessage: String? = nil
+    public private(set) var isConfigured: Bool = false
 
-    /// Configurable RevenueCat API key reading from process environment or Info.plist
-    private var apiKey: String {
+    /// Backward compatibility aliases for existing codebase & test suites
+    public var isProMember: Bool {
+        get { isPro }
+        set { isPro = newValue }
+    }
+
+    public var isProUser: Bool {
+        get { isPro }
+        set { isPro = newValue }
+    }
+
+    public var currentOffering: Offering? {
+        get { offerings?.current }
+        set { _ = newValue }
+    }
+
+    /// Configurable RevenueCat API key with fallback to prompt key
+    public var apiKey: String {
         if let envKey = ProcessInfo.processInfo.environment["REVENUECAT_API_KEY"], !envKey.isEmpty {
             return envKey
         }
         if let infoKey = Bundle.main.object(forInfoDictionaryKey: "RevenueCatAPIKey") as? String, !infoKey.isEmpty {
             return infoKey
         }
-        return ""
+        return "appl_YOUR_REVENUECAT_API_KEY"
     }
 
-    /// Alias for isProMember to support feature gating calls
-    var isProUser: Bool {
-        get { isProMember }
-        set { isProMember = newValue }
-    }
-
-    override init() {
+    public override init() {
         super.init()
-        // Load local offline entitlement cache on startup
-        if let cache = loadEntitlementCache(), cache.isPro {
-            self.isProMember = true
-            print("[SubscriptionManager] Loaded active offline entitlement from local cache (timestamp: \(cache.timestamp)).")
-        } else {
-            self.isProMember = StoreKitManager.shared.isProSubscribed
+        // 1. Offline Resilience: Read from secure Keychain first, then UserDefaults cache fallback
+        if let keychainStatus = KeychainService.shared.readString(forKey: keychainProKey), keychainStatus == "true" {
+            self.isPro = true
+            print("[SubscriptionManager] Offline entitlement active from Keychain.")
+        } else if let cache = loadEntitlementCache(), cache.isPro {
+            self.isPro = true
+            print("[SubscriptionManager] Offline entitlement active from local cache (timestamp: \(cache.timestamp)).")
         }
+        
+        // 2. Configure RevenueCat SDK
+        configure()
+    }
+
+    public func configure() {
         configureRevenueCat()
     }
 
-    func configure() {
-        configureRevenueCat()
-    }
-
-    func configureRevenueCat() {
+    public var isPlaceholderKey: Bool {
         let key = apiKey
-        let isPlaceholder = key.isEmpty || key.contains("YOUR_API_KEY") || key.contains("production_key") || key == "appl_rCat_YOUR_API_KEY_HERE"
-        guard key.hasPrefix("appl_"), !isPlaceholder else {
-            print("[SubscriptionManager] Info: RevenueCat API key is unconfigured or placeholder. Skipping Purchases.configure to prevent 401 error loops. Operating in Native StoreKit 2 fallback mode.")
+        return key.isEmpty || key.contains("YOUR_REVENUECAT_API_KEY") || key.contains("placeholder_key") || key == "appl_YOUR_REVENUECAT_API_KEY"
+    }
+
+    public func configureRevenueCat() {
+        let key = apiKey
+        
+        if !isPlaceholderKey && key.hasPrefix("appl_") {
+            Purchases.logLevel = .debug
+            Purchases.configure(withAPIKey: key)
+            if Purchases.isConfigured {
+                Purchases.shared.delegate = self
+                isConfigured = true
+            }
+        } else {
+            print("[SubscriptionManager] RevenueCat API key is placeholder; suppressing remote network fetches and relying on StoreKit 2 local testing (Products.storekit).")
             isConfigured = false
-            return
         }
 
-        Purchases.logLevel = .debug
-        Purchases.configure(withAPIKey: key)
-        Purchases.shared.delegate = self
-        isConfigured = true
         Task {
             await refreshSubscriptionStatus()
             await fetchOfferings()
         }
     }
 
-    /// Load offerings from both StoreKit 2 and RevenueCat
-    func loadOfferings() async {
+    /// Fetch live offerings from RevenueCat
+    public func fetchOfferings() async {
+        guard isConfigured && !isPlaceholderKey && Purchases.isConfigured else {
+            _ = try? await StoreKitManager.shared.loadProducts()
+            return
+        }
         isLoading = true
         defer { isLoading = false }
-        
-        // Load StoreKit 2 Products
-        _ = try? await StoreKitManager.shared.loadProducts()
-        
-        // Fetch RevenueCat offerings if configured
-        if isConfigured {
-            await fetchOfferings()
-        }
-    }
-
-    /// Refresh entitlement state for "pro_access" or "pro"
-    func refreshSubscriptionStatus() async {
-        if isConfigured && Purchases.isConfigured {
-            do {
-                let customerInfo = try await Purchases.shared.customerInfo()
-                updateProStatus(from: customerInfo)
-                return
-            } catch {
-                print("[SubscriptionManager] RevenueCat Status Error: \(error.localizedDescription)")
-            }
-        }
-        await StoreKitManager.shared.checkEntitlements()
-        self.isProMember = StoreKitManager.shared.isProSubscribed
-    }
-
-    /// Fetch active RevenueCat offerings with graceful fallback handling
-    func fetchOfferings() async {
-        guard isConfigured, Purchases.isConfigured else { return }
         do {
-            let offerings = try await Purchases.shared.offerings()
-            self.currentOffering = offerings.current
+            let fetchedOfferings = try await Purchases.shared.offerings()
+            self.offerings = fetchedOfferings
+            self.errorMessage = nil
         } catch {
-            print("[SubscriptionManager] Offerings Fetch Error: \(error.localizedDescription)")
+            print("[SubscriptionManager] Fetch Offerings Error: \(error.localizedDescription)")
             self.errorMessage = "Live products currently unavailable."
         }
     }
 
-    /// Purchase weekly subscription ($2.99/wk)
+    /// Purchase a RevenueCat Package
     @discardableResult
-    func purchaseWeekly() async -> Bool {
-        return await purchaseProduct(id: StoreKitManager.weeklyProductID)
-    }
-
-    /// Purchase annual subscription ($29.99/yr)
-    @discardableResult
-    func purchaseAnnual() async -> Bool {
-        return await purchaseProduct(id: StoreKitManager.annualProductID)
-    }
-
-    /// Unified Purchase Entry Point by Product ID
-    @discardableResult
-    func purchaseProduct(id: String) async -> Bool {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-
-        // RevenueCat purchase if configured and offering contains matching package
-        if isConfigured, Purchases.isConfigured, let offering = currentOffering {
-            let targetPackage = offering.availablePackages.first(where: { $0.storeProduct.productIdentifier == id })
-            if let pkg = targetPackage {
-                return await purchase(package: pkg)
-            }
-        }
-
-        // Native StoreKit 2 Purchase Fallback
-        do {
-            let products = try await StoreKitManager.shared.loadProducts()
-            guard let product = products.first(where: { $0.id == id }) else {
-                let err = StoreKitError.productNotFound(id)
-                self.errorMessage = err.localizedDescription
-                return false
-            }
-            let res = try await StoreKitManager.shared.purchase(product)
-            switch res {
-            case .success:
-                self.isProMember = true
-                saveEntitlementCache(isPro: true, productID: id)
-                return true
-            case .userCancelled:
-                print("[SubscriptionManager] User cancelled purchase for product '\(id)'.")
-                return false
-            case .pending:
-                self.errorMessage = "Purchase is pending approval (Ask to Buy)."
-                return false
-            case .unverified(let err):
-                self.errorMessage = "JWS Verification Failed: \(err.localizedDescription)"
-                self.isProMember = false
-                saveEntitlementCache(isPro: false, productID: id)
-                return false
-            }
-        } catch {
-            self.errorMessage = error.localizedDescription
-            print("[SubscriptionManager] Purchase Error: \(error.localizedDescription)")
-            return false
-        }
-    }
-
-    /// Purchase a selected RevenueCat package
-    @discardableResult
-    func purchase(package: Package) async -> Bool {
-        guard isConfigured, Purchases.isConfigured else {
+    public func purchase(package: Package) async -> Bool {
+        guard Purchases.isConfigured else {
             return await purchaseProduct(id: package.storeProduct.productIdentifier)
         }
         isLoading = true
@@ -207,27 +147,27 @@ final class SubscriptionManager: NSObject, PurchasesDelegate {
             let result = try await Purchases.shared.purchase(package: package)
             if !result.userCancelled {
                 updateProStatus(from: result.customerInfo)
-                return isProMember
+                return self.isPro
             }
         } catch {
             self.errorMessage = error.localizedDescription
-            print("[SubscriptionManager] Purchase Error: \(error.localizedDescription)")
+            print("[SubscriptionManager] RevenueCat Package Purchase Error: \(error.localizedDescription)")
         }
         return false
     }
 
-    /// Restore prior purchases via StoreKit 2 and RevenueCat
+    /// Restore Purchases via RevenueCat & StoreKit 2 fallback
     @discardableResult
-    func restorePurchases() async -> Bool {
+    public func restorePurchases() async -> Bool {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
-        if isConfigured, Purchases.isConfigured {
+        if Purchases.isConfigured {
             do {
                 let customerInfo = try await Purchases.shared.restorePurchases()
                 updateProStatus(from: customerInfo)
-                if isProMember { return true }
+                if self.isPro { return true }
             } catch {
                 print("[SubscriptionManager] RevenueCat Restore Error: \(error.localizedDescription)")
             }
@@ -235,27 +175,105 @@ final class SubscriptionManager: NSObject, PurchasesDelegate {
 
         do {
             let restored = try await StoreKitManager.shared.restorePurchases()
-            let newStatus = self.isProMember || restored
-            self.isProMember = newStatus
+            let newStatus = self.isPro || restored
+            self.isPro = newStatus
             saveEntitlementCache(isPro: newStatus)
             return newStatus
         } catch {
             self.errorMessage = error.localizedDescription
             print("[SubscriptionManager] StoreKit Restore Error: \(error.localizedDescription)")
-            return self.isProMember
+            return self.isPro
         }
     }
 
-    // MARK: - Offline Entitlement Cache Persistence
+    /// Load offerings from both StoreKit 2 and RevenueCat
+    public func loadOfferings() async {
+        isLoading = true
+        defer { isLoading = false }
+        _ = try? await StoreKitManager.shared.loadProducts()
+        await fetchOfferings()
+    }
 
-    func saveEntitlementCache(isPro: Bool, productID: String? = nil) {
+    /// Refresh subscription entitlement status
+    public func refreshSubscriptionStatus() async {
+        if isConfigured && !isPlaceholderKey && Purchases.isConfigured {
+            do {
+                let customerInfo = try await Purchases.shared.customerInfo()
+                updateProStatus(from: customerInfo)
+                return
+            } catch {
+                print("[SubscriptionManager] RevenueCat CustomerInfo Status Error: \(error.localizedDescription)")
+            }
+        }
+        await StoreKitManager.shared.checkEntitlements()
+        self.isPro = StoreKitManager.shared.isProSubscribed
+    }
+
+    /// Unified Purchase Entry Point by Product ID
+    @discardableResult
+    public func purchaseProduct(id: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        if Purchases.isConfigured, let currentOffering = offerings?.current {
+            let targetPackage = currentOffering.availablePackages.first(where: { $0.storeProduct.productIdentifier == id })
+            if let pkg = targetPackage {
+                return await purchase(package: pkg)
+            }
+        }
+
+        do {
+            let products = try await StoreKitManager.shared.loadProducts()
+            guard let product = products.first(where: { $0.id == id }) else {
+                let err = StoreKitError.productNotFound(id)
+                self.errorMessage = err.localizedDescription
+                return false
+            }
+            let res = try await StoreKitManager.shared.purchase(product)
+            switch res {
+            case .success:
+                self.isPro = true
+                saveEntitlementCache(isPro: true, productID: id)
+                return true
+            case .userCancelled:
+                return false
+            case .pending:
+                self.errorMessage = "Purchase is pending approval."
+                return false
+            case .unverified(let err):
+                self.errorMessage = "JWS Verification Failed: \(err.localizedDescription)"
+                self.isPro = false
+                saveEntitlementCache(isPro: false, productID: id)
+                return false
+            }
+        } catch {
+            self.errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    public func purchaseWeekly() async -> Bool {
+        return await purchaseProduct(id: StoreKitManager.weeklyProductID)
+    }
+
+    @discardableResult
+    public func purchaseAnnual() async -> Bool {
+        return await purchaseProduct(id: StoreKitManager.annualProductID)
+    }
+
+    // MARK: - Offline Entitlement Persistence
+
+    public func saveEntitlementCache(isPro: Bool, productID: String? = nil) {
         let cache = ProEntitlementCache(isPro: isPro, timestamp: Date(), productID: productID)
         if let data = try? JSONEncoder().encode(cache) {
             UserDefaults.standard.set(data, forKey: entitlementCacheKey)
         }
+        KeychainService.shared.saveString(isPro ? "true" : "false", forKey: keychainProKey)
     }
 
-    func loadEntitlementCache() -> ProEntitlementCache? {
+    public func loadEntitlementCache() -> ProEntitlementCache? {
         guard let data = UserDefaults.standard.data(forKey: entitlementCacheKey) else { return nil }
         return try? JSONDecoder().decode(ProEntitlementCache.self, from: data)
     }
@@ -264,11 +282,11 @@ final class SubscriptionManager: NSObject, PurchasesDelegate {
         let isProAccess = customerInfo.entitlements["pro_access"]?.isActive == true
         let isProFallback = customerInfo.entitlements["pro"]?.isActive == true
         let active = isProAccess || isProFallback
-        self.isProMember = active
+        self.isPro = active
         saveEntitlementCache(isPro: active)
     }
 
-    nonisolated func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
+    public nonisolated func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
         Task { @MainActor in
             self.updateProStatus(from: customerInfo)
         }

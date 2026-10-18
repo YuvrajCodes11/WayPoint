@@ -39,6 +39,18 @@ final class WayPointMasterTestSuite {
 
         var summaries: [SuiteSummary] = []
 
+        // Phase 1: Dynamic Trip Data Models & LifeCycle
+        DynamicTripStoreTests.runAllTests()
+
+        // Phase 3: Dynamic Panic Pivot Disruption Defense Engine
+        PanicPivotEngineTests.runAllTests()
+
+        // Phase 4: Secure Pass Store & Barcode Generator Tests
+        SecurePassStoreTests.runAllTests()
+
+        // Module 5: Production System Architecture Tests (AppConfig, Keychain, StoreKit, Network)
+        ProductionArchitectureTests.runAllTests()
+
         // WP1: Sync Queue Bounding, Persistence Corrupt Recovery, Conflict Revisions
         let r11 = await Task11SyncQueueTests.shared.runAllTask11Tests()
         summaries.append(summarize(name: "WP1.1 - Sync Queue Bounding", passed: r11.filter(\.passed).count, total: r11.count))

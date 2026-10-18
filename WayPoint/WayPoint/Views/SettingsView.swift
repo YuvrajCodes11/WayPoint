@@ -12,6 +12,7 @@ struct SettingsView: View {
     @Environment(TripStore.self) private var tripStore
 
     @State private var showPaywall = false
+    @State private var showConnectivityHub = false
     @State private var flightAlertsEnabled = true
     @State private var offlineCachingEnabled = true
 
@@ -20,10 +21,13 @@ struct SettingsView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
                     headerSection
+                    connectivitySection
                     accountSyncSection
+                    tripResetSection
                     subscriptionSection
                     notificationSection
                     offlineSection
+                    logOutSection
                     legalSection
                 }
                 .padding(.horizontal, 20)
@@ -31,11 +35,36 @@ struct SettingsView: View {
                 .padding(.bottom, 100)
             }
             .scrollContentBackground(.hidden)
+
+            if let toast = toastMessage {
+                VStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(WayPointTheme.emeraldRecovery)
+                        Text(toast)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(WayPointTheme.obsidianElevated, in: Capsule())
+                    .overlay(Capsule().strokeBorder(WayPointTheme.emeraldRecovery.opacity(0.4), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 5)
+                    .padding(.top, 10)
+
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(200)
+            }
         }
         .background(Color.clear)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showPaywall) {
             PaywallView()
+        }
+        .sheet(isPresented: $showConnectivityHub) {
+            ConnectivityHubView()
         }
     }
 
@@ -53,6 +82,42 @@ struct SettingsView: View {
                 .foregroundStyle(WayPointTheme.textPrimary)
         }
         .padding(.top, 8)
+    }
+
+    // MARK: - Connectivity Section
+
+    private var connectivitySection: some View {
+        GlassCardView(cornerRadius: 20, padding: 18) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.headline)
+                            .foregroundStyle(WayPointTheme.cyanGlow)
+
+                        Text("Travel & Cellular Connectivity")
+                            .font(.headline)
+                            .foregroundStyle(WayPointTheme.textPrimary)
+                    }
+
+                    Spacer()
+
+                    Button(action: { showConnectivityHub = true }) {
+                        Text("Open Hub")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(WayPointTheme.cyanGlow)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(WayPointTheme.obsidianSurface, in: Capsule())
+                            .overlay(Capsule().strokeBorder(WayPointTheme.cyanGlow.opacity(0.4), lineWidth: 1))
+                    }
+                }
+
+                Text("Manage SIM/eSIM roaming guides, carrier device unlocks, APN settings, and airport kiosk details.")
+                    .font(.caption)
+                    .foregroundStyle(WayPointTheme.textSecondary)
+            }
+        }
     }
 
     @State private var showResetConfirmation = false
@@ -141,6 +206,54 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Dynamic Trip Reset Section (Phase 1)
+
+    private var tripResetSection: some View {
+        GlassCardView(cornerRadius: 20, padding: 18) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 8) {
+                    Image(systemName: "trash.circle.fill")
+                        .font(.headline)
+                        .foregroundStyle(WayPointTheme.crimsonAlert)
+
+                    Text("Current Trip")
+                        .font(.headline)
+                        .foregroundStyle(WayPointTheme.textPrimary)
+                }
+
+                Text("Resetting your current active trip clears saved itinerary data and returns to the Trip Genesis setup flow.")
+                    .font(.caption)
+                    .foregroundStyle(WayPointTheme.textSecondary)
+
+                Button(action: {
+                    showResetConfirmation = true
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.counterclockwise.circle.fill")
+                            .font(.subheadline.weight(.bold))
+                        Text("Reset Current Trip")
+                            .font(.subheadline.weight(.bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(WayPointTheme.crimsonAlert.opacity(0.8))
+                    )
+                }
+            }
+        }
+        .confirmationDialog("Reset Current Trip?", isPresented: $showResetConfirmation, titleVisibility: .visible) {
+            Button("Reset & Restart Setup", role: .destructive) {
+                tripStore.clearCurrentTrip()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action clears your dynamic active trip and returns to the setup wizard.")
+        }
+    }
+
     // MARK: - Subscription Section
 
     private var subscriptionSection: some View {
@@ -184,19 +297,42 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(WayPointTheme.textSecondary)
 
-                if !subscriptionManager.isProMember {
-                    Button(action: { showPaywall = true }) {
-                        HStack(spacing: 6) {
-                            Text("Upgrade to Pro")
-                                .font(.subheadline.weight(.bold))
-                            Image(systemName: "arrow.right")
-                                .font(.caption.weight(.bold))
+                HStack {
+                    if !subscriptionManager.isProMember {
+                        Button(action: { showPaywall = true }) {
+                            HStack(spacing: 6) {
+                                Text("Upgrade to Pro")
+                                    .font(.subheadline.weight(.bold))
+                                Image(systemName: "arrow.right")
+                                    .font(.caption.weight(.bold))
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(WayPointTheme.accentGradient)
+                            .cornerRadius(14)
                         }
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(WayPointTheme.accentGradient)
-                        .cornerRadius(14)
+                    }
+
+                    Spacer()
+
+                    Button(action: {
+                        Task {
+                            let restored = await subscriptionManager.restorePurchases()
+                            if restored {
+                                showToast("Purchases successfully restored!")
+                            } else {
+                                showToast(subscriptionManager.errorMessage ?? "No active subscription found.")
+                            }
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption.weight(.bold))
+                            Text("Restore Purchases")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(WayPointTheme.textSecondary)
                     }
                 }
             }
@@ -241,6 +377,24 @@ struct SettingsView: View {
         }
     }
 
+    @State private var offlineSimulationMode: Bool = false
+    @State private var toastMessage: String? = nil
+
+    private func showToast(_ message: String) {
+        Haptics.notification(.success)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            toastMessage = message
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            withAnimation(.easeInOut(duration: 0.3)) {
+                if toastMessage == message {
+                    toastMessage = nil
+                }
+            }
+        }
+    }
+
     // MARK: - Offline Caching Section
 
     private var offlineSection: some View {
@@ -256,18 +410,59 @@ struct SettingsView: View {
                         .foregroundStyle(WayPointTheme.textPrimary)
                 }
 
-                Toggle(isOn: $offlineCachingEnabled) {
+                Toggle(isOn: $offlineSimulationMode) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Offline Map Caching")
+                        Text("Offline Simulation Mode")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(WayPointTheme.textPrimary)
 
-                        Text("Pre-load trip maps and passes for offline access without roaming data.")
+                        Text("Simulates zero-network air-gapped environment.")
                             .font(.caption)
                             .foregroundStyle(WayPointTheme.textSecondary)
                     }
                 }
                 .tint(WayPointTheme.cyanGlow)
+                .onChange(of: offlineSimulationMode) { _, enabled in
+                    showToast(enabled ? "Offline Simulation Active" : "Online Mode Restored")
+                }
+
+                HStack {
+                    Text("Current City")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(WayPointTheme.textPrimary)
+
+                    Spacer()
+
+                    Picker("Current City", selection: Binding(
+                        get: { tripStore.activeCity },
+                        set: { newCity in
+                            withAnimation {
+                                tripStore.activeCity = newCity
+                            }
+                        }
+                    )) {
+                        ForEach(City.allCases) { city in
+                            Text("\(city.flag) \(city.rawValue)").tag(city)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                Button(action: {
+                    OfflineImageStore.shared.clearDiskCache()
+                    showToast("Disk image cache cleared")
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "photo.stack.fill")
+                            .font(.caption.weight(.bold))
+                        Text("Clear Image Cache")
+                            .font(.caption.weight(.bold))
+                    }
+                    .foregroundStyle(WayPointTheme.cyanGlow)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(WayPointTheme.cyanGlow.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                }
 
                 Button(action: { showResetConfirmation = true }) {
                     HStack(spacing: 6) {
@@ -288,6 +483,62 @@ struct SettingsView: View {
                     }
                 } message: {
                     Text("This will clear local trip caches and restore the Tokyo demo itinerary state.")
+                }
+            }
+        }
+    }
+
+    @State private var showLogoutConfirmation = false
+
+    private var logOutSection: some View {
+        GlassCardView(cornerRadius: 20, padding: 18) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 8) {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.headline)
+                        .foregroundStyle(Color.red)
+
+                    Text("Session & Account Switch")
+                        .font(.headline)
+                        .foregroundStyle(WayPointTheme.textPrimary)
+                }
+
+                Text("Sign out of your active account, clear cached session keys from Apple Keychain, and return to the onboarding screen.")
+                    .font(.caption)
+                    .foregroundStyle(WayPointTheme.textSecondary)
+
+                Button(action: { showLogoutConfirmation = true }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "power")
+                            .font(.subheadline.weight(.bold))
+                        Text("Log Out / Switch Account")
+                            .font(.subheadline.weight(.bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.red, Color(red: 0.8, green: 0.1, blue: 0.2)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+                    .shadow(color: Color.red.opacity(0.3), radius: 8, x: 0, y: 4)
+                }
+                .alert("Log Out of WayPoint?", isPresented: $showLogoutConfirmation) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Log Out", role: .destructive) {
+                        Task {
+                            await supabaseService.signOut()
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                supabaseService.launchState = .onboarding
+                            }
+                        }
+                    }
+                } message: {
+                    Text("This will purge active Keychain session tokens and return you to the onboarding sign-in screen.")
                 }
             }
         }

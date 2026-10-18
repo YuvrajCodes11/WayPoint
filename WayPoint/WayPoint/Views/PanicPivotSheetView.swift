@@ -114,7 +114,7 @@ struct PanicPivotSheetView: View {
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(WayPointTheme.sapphireAccent)
 
-                        Text("PANIC PIVOT ENGINE")
+                        Text("REROUTE PLAN")
                             .font(.caption.weight(.bold))
                             .tracking(1.4)
                             .foregroundStyle(WayPointTheme.sapphireAccent)

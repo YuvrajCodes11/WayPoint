@@ -163,6 +163,26 @@ public final class GraphRouter: ObservableObject, @unchecked Sendable {
             setupFallbackGraph()
         }
     }
+
+    public func switchCity(to city: String) {
+        let cityLower = city.lowercased()
+        if cityLower.contains("london") {
+            loadGraphFromBundle(filename: "london_underground_graph")
+            self.originStationId = "paddington"
+            self.destinationStationId = "westminster"
+        } else {
+            loadGraphFromBundle(filename: "tokyo_metro_graph")
+            self.originStationId = "shibuya"
+            self.destinationStationId = "tokyo"
+        }
+        _ = self.calculateShortestPath(from: originStationId, to: destinationStationId)
+    }
+    
+    // MARK: - Alias for Pathfinding
+    @discardableResult
+    public func calculateShortestPath(from startId: String, to endId: String) -> RouteResult? {
+        return findFastestPath(from: startId, to: endId)
+    }
     
     public func buildGraph(stations: [StationNode], edges: [TrackEdge]) {
         self.stations = stations

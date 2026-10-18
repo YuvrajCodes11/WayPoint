@@ -8,38 +8,25 @@
 import Foundation
 
 public struct SupabaseConfig {
+    public static var isOfflineMode: Bool {
+        guard let url = AppConfig.shared.supabaseURL else { return true }
+        return url.absoluteString.contains("local.waypoint.internal") || !AppConfig.shared.isLiveBackendConfigured
+    }
+
     public static var urlString: String {
-        if let envUrl = ProcessInfo.processInfo.environment["SUPABASE_URL"], !envUrl.isEmpty {
-            return envUrl
-        }
-        if let configUrl = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String, !configUrl.isEmpty {
-            return configUrl
-        }
-        return "https://ghqsjpsdpxswxwescjcm.supabase.co"
+        AppConfig.shared.supabaseURL?.absoluteString ?? "https://local.waypoint.internal"
     }
 
     public static var publishableKey: String {
-        if let envKey = ProcessInfo.processInfo.environment["SUPABASE_PUBLISHABLE_KEY"], !envKey.isEmpty {
-            return envKey
-        }
-        if let configKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_PUBLISHABLE_KEY") as? String, !configKey.isEmpty {
-            return configKey
-        }
-        return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdocXNqcHNkcHhzd3h3ZXNjamNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MDMxNzMsImV4cCI6MjEwMjE3OTE3M30.vtmqixKiCmGpVjSU6TDuDEOtM0es9WjwVXADQzhY1XY"
+        AppConfig.shared.supabaseAnonKey ?? ""
     }
 
     public static var url: URL {
-        URL(string: urlString)!
+        AppConfig.shared.supabaseURL ?? URL(string: "https://local.waypoint.internal")!
     }
 
     public static func validateSecretsConfiguration() -> Bool {
-        #if !DEBUG
-        if publishableKey.contains("placeholder") || publishableKey.contains("CHANGE_ME") {
-            print("[SECURITY WARNING] Release mode detected with unconfigured placeholder Supabase key!")
-            return false
-        }
-        #endif
-        return true
+        return AppConfig.shared.isLiveBackendConfigured && !isOfflineMode
     }
 }
 

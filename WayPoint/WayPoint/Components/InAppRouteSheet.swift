@@ -230,16 +230,39 @@ struct InAppRouteSheet: View {
                     }
                 }
 
-                // Done Button
-                Button(action: { dismiss() }) {
-                    Text("Done")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                // Action Buttons
+                HStack(spacing: 12) {
+                    Button(action: {
+                        let placemark = MKPlacemark(coordinate: destinationLocation)
+                        let mapItem = MKMapItem(placemark: placemark)
+                        mapItem.name = item.title
+                        mapItem.openInMaps(launchOptions: [
+                            MKLaunchOptionsDirectionsModeKey: selectedTransportType == .automobile ? MKLaunchOptionsDirectionsModeDriving : MKLaunchOptionsDirectionsModeWalking
+                        ])
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                                .font(.caption.weight(.bold))
+                            Text("Apple Maps")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                        }
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(WayPointTheme.emeraldRecovery, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .padding(.horizontal, 14)
+                        .background(WayPointTheme.sapphireAccent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.scalePress)
+
+                    Button(action: { dismiss() }) {
+                        Text("Done")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(WayPointTheme.emeraldRecovery, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.scalePress)
                 }
-                .buttonStyle(.scalePress)
             }
         }
     }

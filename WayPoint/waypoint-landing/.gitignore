@@ -1,1 +1,10 @@
 .vercel
+
+# Environment & Secrets
+.env
+.env*.local
+.env.production
+*.pem
+*.key
+credentials.json
+

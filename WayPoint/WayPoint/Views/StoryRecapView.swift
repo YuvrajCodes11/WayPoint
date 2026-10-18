@@ -64,7 +64,7 @@ struct StoryRecapView: View {
         🛡️ Resilience: \(metrics.neutralizedDisruptionsCount) disruptions neutralized
         🔒 Passes: \(metrics.preservedReservationsRateText)
         💳 Budget Pace: \(metrics.totalSpentText) spent of \(metrics.budgetLimitText) limit
-        ✨ Planned with WayPoint Panic Pivot Recovery Engine
+        ✨ Planned with WayPoint Smart Reroute Engine
         """
     }
 
@@ -148,7 +148,7 @@ struct StoryRecapView: View {
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.black)
 
-                    Text("PANIC PIVOT ENGINE")
+                    Text("REROUTE PLAN")
                         .font(.system(size: 9, weight: .heavy, design: .monospaced))
                         .foregroundStyle(.black)
                 }

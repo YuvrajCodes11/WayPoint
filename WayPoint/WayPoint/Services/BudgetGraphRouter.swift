@@ -103,6 +103,12 @@ public final class BudgetGraphRouter: ObservableObject, @unchecked Sendable {
     public var isPanicActive: Bool = false
     public var lastAvoidedStationId: String? = nil
     
+    // User Selection State
+    public var selectedOriginId: String = "shibuya"
+    public var selectedDestinationId: String = "tokyo"
+    public var maxBudgetCents: Double = 500
+    public var prioritizeSpeed: Bool = true
+    
     // Fast Lookup Structures
     private var stationDict: [String: Station] = [:]
     private var adjacencyList: [String: [(toId: String, connection: TransitConnection)]] = [:]

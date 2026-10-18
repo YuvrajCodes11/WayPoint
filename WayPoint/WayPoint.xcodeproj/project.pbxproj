@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		54E19AA3302C44F000CD7FBD /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 54RC0002302C44F000CD7FBD /* RevenueCat */; };
 		54E19AFA302CC1EF00CD7FBD /* SplineRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 54E19AF9302CC1EF00CD7FBD /* SplineRuntime */; };
+		54RC0004302C44F000CD7FBD /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 54RC0003302C44F000CD7FBD /* RevenueCatUI */; };
 		54SB0002302C44F000CD7FBD /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 54SB0001302C44F000CD7FBD /* Supabase */; };
 /* End PBXBuildFile section */
 
@@ -44,6 +45,7 @@
 			files = (
 				54E19AFA302CC1EF00CD7FBD /* SplineRuntime in Frameworks */,
 				54E19AA3302C44F000CD7FBD /* RevenueCat in Frameworks */,
+				54RC0004302C44F000CD7FBD /* RevenueCatUI in Frameworks */,
 				54SB0002302C44F000CD7FBD /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -88,6 +90,7 @@
 			name = WayPoint;
 			packageProductDependencies = (
 				54RC0002302C44F000CD7FBD /* RevenueCat */,
+				54RC0003302C44F000CD7FBD /* RevenueCatUI */,
 				54E19AF9302CC1EF00CD7FBD /* SplineRuntime */,
 				54SB0001302C44F000CD7FBD /* Supabase */,
 			);
@@ -402,6 +405,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 54RC0001302C44F000CD7FBD /* XCRemoteSwiftPackageReference "purchases-ios" */;
 			productName = RevenueCat;
+		};
+		54RC0003302C44F000CD7FBD /* RevenueCatUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 54RC0001302C44F000CD7FBD /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCatUI;
 		};
 		54SB0001302C44F000CD7FBD /* Supabase */ = {
 			isa = XCSwiftPackageProductDependency;

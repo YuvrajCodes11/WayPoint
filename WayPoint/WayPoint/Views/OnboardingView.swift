@@ -22,30 +22,17 @@ struct OnboardingPage: Identifiable {
 
 struct Onboarding3DBackground: View {
     var body: some View {
-        #if canImport(WebKit) && canImport(UIKit)
-        SplineWebContainer(urlString: "https://my.spline.design/customlinepathwithcustommatcap-Oken3h6jm2uzoJ2BVGzdfhQe/")
-            .scaleEffect(1.06)
-            .clipped()
-            .ignoresSafeArea(.all)
-            .allowsHitTesting(false)
-        #else
-        fallbackMeshBackground
-        #endif
-    }
-
-    private var fallbackMeshBackground: some View {
         ZStack {
-            WayPointTheme.obsidian.ignoresSafeArea()
-            Circle()
-                .fill(WayPointTheme.cyanGlow.opacity(0.22))
-                .frame(width: 340, height: 340)
-                .blur(radius: 80)
-                .offset(x: -90, y: -180)
-            Circle()
-                .fill(WayPointTheme.violetGlow.opacity(0.20))
-                .frame(width: 380, height: 380)
-                .blur(radius: 95)
-                .offset(x: 140, y: 120)
+            (Color(hex: "070B14") ?? Color.black).ignoresSafeArea()
+            SplineWebContainer(urlString: "https://my.spline.design/customlinepathwithcustommatcap-Oken3h6jm2uzoJ2BVGzdfhQe/")
+                .ignoresSafeArea()
+            LinearGradient(
+                colors: [Color.black.opacity(0.15), Color.black.opacity(0.75)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
         }
     }
 }
@@ -54,32 +41,33 @@ struct Onboarding3DBackground: View {
 
 struct OnboardingView: View {
     @Environment(SupabaseService.self) private var supabaseService
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @State private var currentPage: Int = 0
     @State private var showAuthSheet: Bool = false
 
     private let pages: [OnboardingPage] = [
         OnboardingPage(
             id: 0,
-            icon: "sparkles",
-            tag: "AI RE-BALANCING ENGINE",
-            title: "AI Travel Co-Pilot",
-            description: "Real-time itinerary optimization for sudden weather shifts, flight delays & daily pacing.",
+            icon: "map.fill",
+            tag: "Offline Maps",
+            title: "Offline-First Transit Maps",
+            description: "100% air-gapped schematic metro graphs and offline turn-by-turn route calculations.",
             glowColor: WayPointTheme.cyanGlow
         ),
         OnboardingPage(
             id: 1,
-            icon: "map.fill",
-            tag: "SPATIAL RADAR & ROUTING",
-            title: "GPS Radar & Spatial Maps",
-            description: "Dark-mode spatial radar, live polyline routes, and Apple Maps turn-by-turn navigation.",
+            icon: "shield.fill",
+            tag: "ENCRYPTED LOCAL VAULT",
+            title: "On-Device Pass Vault",
+            description: "Hardware-encrypted Keychain vault for transit passes, flight tickets, and hotel keys with vector QR codes.",
             glowColor: WayPointTheme.violetGlow
         ),
         OnboardingPage(
             id: 2,
-            icon: "ticket.fill",
-            tag: "DIGITAL PASS VAULT",
-            title: "Scannable Pass Vault",
-            description: "Store offline boarding passes, hotel vouchers, and instant QR barcodes anywhere in the world.",
+            icon: "chart.line.uptrend.xyaxis",
+            tag: "AUTONOMOUS BUDGET PACING",
+            title: "Autonomous Budgeting",
+            description: "Real-time daily budget pace tracking and instant category envelope re-balancing.",
             glowColor: WayPointTheme.cyanGlow
         )
     ]
@@ -110,7 +98,7 @@ struct OnboardingView: View {
                 pageIndicatorDots
                     .padding(.bottom, 24)
 
-                // Primary Glassmorphic Action Button
+                // Primary Action Buttons
                 actionButton
                     .padding(.horizontal, 24)
                     .padding(.bottom, 36)
@@ -201,36 +189,43 @@ struct OnboardingView: View {
 
     private var actionButton: some View {
         VStack(spacing: 12) {
-            Button(action: { showAuthSheet = true }) {
-                HStack(spacing: 10) {
-                    Image(systemName: "arrow.right.circle.fill")
-                        .font(.title3.weight(.semibold))
+            Button(action: {
+                hasCompletedOnboarding = true
+                showAuthSheet = true
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "apple.logo")
+                        .font(.body.weight(.bold))
 
-                    Text("Get Started with Phone / Email")
+                    Text("Sign in with Apple")
                         .font(.headline.weight(.bold))
                 }
                 .foregroundColor(.black)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(WayPointTheme.accentGradient)
+                .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .shadow(color: WayPointTheme.cyanGlow.opacity(0.4), radius: 14, x: 0, y: 6)
+                .shadow(color: Color.white.opacity(0.3), radius: 10, x: 0, y: 4)
             }
             .buttonStyle(.plain)
 
             Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    supabaseService.signInAsGuest()
+                hasCompletedOnboarding = true
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    supabaseService.continueAsGuestOffline()
                 }
             }) {
                 HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "airplane")
                         .font(.caption.weight(.bold))
-                    Text("Explore Demo Mode")
+                    Text("Continue as Guest / Offline Mode")
                         .font(.subheadline.weight(.semibold))
                 }
-                .foregroundStyle(WayPointTheme.textSecondary)
-                .padding(.vertical, 6)
+                .foregroundStyle(WayPointTheme.cyanGlow)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .background(WayPointTheme.obsidianElevated, in: RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(WayPointTheme.cyanGlow.opacity(0.4), lineWidth: 1))
             }
             .buttonStyle(.plain)
         }

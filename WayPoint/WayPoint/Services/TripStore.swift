@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 import Observation
 import Network
 
@@ -28,7 +29,7 @@ struct SyncQueueItem: Codable, Identifiable {
 
 @MainActor
 @Observable
-final class TripStore {
+final class TripStore: ObservableObject {
     static let shared = TripStore()
 
     private let tripStorageKey = "waypoint_persisted_trip_data_v2"
@@ -58,6 +59,24 @@ final class TripStore {
     private(set) var isNetworkReachable: Bool = true
 
     var activeTrip: Trip
+    var currentTrip: DynamicTrip?
+    var activeCity: City = .london {
+        didSet {
+            GraphRouter.shared.switchCity(to: activeCity.rawValue)
+            activeTrip.destination = activeCity.rawValue
+        }
+    }
+
+    var selectedDayIndex: Int {
+        get { activeTrip.selectedDayIndex }
+        set { selectDay(newValue) }
+    }
+
+    var currentDayStops: [ItineraryItem] {
+        guard activeTrip.days.indices.contains(selectedDayIndex) else { return [] }
+        return activeTrip.days[selectedDayIndex].items
+    }
+
     var totalCommissionEarned: Double
     var userBookings: [Booking]
     private(set) var hasPendingRemoteSync: Bool
@@ -81,6 +100,13 @@ final class TripStore {
         let (loadedTrip, tripCorrupted) = Self.loadPersistedTripWithStatus()
         activeTrip = loadedTrip ?? Trip.createSampleTrip()
         hasRecoveredFromCorruptedTrip = tripCorrupted || bookingsCorrupted
+
+        if let dynamicData = UserDefaults.standard.data(forKey: "waypoint_active_user_trip_v1"),
+           let decodedTrip = try? JSONDecoder().decode(DynamicTrip.self, from: dynamicData) {
+            self.currentTrip = decodedTrip
+        } else {
+            self.currentTrip = nil
+        }
 
         setupNetworkMonitoring()
     }
@@ -238,6 +264,200 @@ final class TripStore {
             mutate("undo panic pivot") { _ in } // persist local & queue sync mutation
         }
         return UndoPivotManager.shared.lastResult(for: targetDayID)
+    }
+
+    func addStop(_ item: ItineraryItem) {
+        addStop(to: nil, item: item)
+    }
+
+    func addStop(to dayID: UUID? = nil, item: ItineraryItem) {
+        let targetDayID = dayID ?? activeTrip.currentDayPlan.id
+        guard let dayIndex = activeTrip.days.firstIndex(where: { $0.id == targetDayID }) else { return }
+        mutate("add itinerary item") { trip in
+            trip.days[dayIndex].items.append(item)
+            recalculateSpentAmount(for: dayIndex, in: trip)
+            rebalanceBudgetInternal(for: dayIndex, in: trip)
+        }
+    }
+
+    func deleteStop(at offsets: IndexSet) {
+        let targetDayID = activeTrip.currentDayPlan.id
+        guard let dayIndex = activeTrip.days.firstIndex(where: { $0.id == targetDayID }) else { return }
+        mutate("delete itinerary item") { trip in
+            trip.days[dayIndex].items.remove(atOffsets: offsets)
+            recalculateSpentAmount(for: dayIndex, in: trip)
+            rebalanceBudgetInternal(for: dayIndex, in: trip)
+        }
+    }
+
+    @discardableResult
+    func rebalanceBudget(for dayID: UUID? = nil) -> String {
+        let targetDayID = dayID ?? activeTrip.currentDayPlan.id
+        guard let dayIndex = activeTrip.days.firstIndex(where: { $0.id == targetDayID }) else { return "No active day" }
+        var resultMessage = ""
+        mutate("re-balance budget envelope") { trip in
+            resultMessage = rebalanceBudgetInternal(for: dayIndex, in: trip)
+        }
+        Haptics.notification(.success)
+        return resultMessage
+    }
+
+    @discardableResult
+    private func rebalanceBudgetInternal(for dayIndex: Int, in trip: Trip) -> String {
+        let items = trip.days[dayIndex].items
+        var total: Decimal = 0
+        for item in items {
+            total += item.estimatedCost
+        }
+        if total > trip.days[dayIndex].budgetLimit {
+            trip.days[dayIndex].budgetLimit = total * Decimal(1.15)
+        }
+        recalculateSpentAmount(for: dayIndex, in: trip)
+        let rem = trip.days[dayIndex].budgetLimit - trip.days[dayIndex].spentAmount
+        return "Budget optimized: \(trip.days[dayIndex].formatCurrency(rem)) remaining"
+    }
+
+    // MARK: - Dynamic User Trip Lifecycle Methods (Phase 1)
+
+    public func createTrip(
+        origin: String,
+        destination: String,
+        type: TripType,
+        startDate: Date,
+        endDate: Date,
+        budget: BudgetAllocation
+    ) {
+        let calendar = Calendar.current
+        let dayCount = max(1, calendar.dateComponents([.day], from: calendar.startOfDay(for: startDate), to: calendar.startOfDay(for: endDate)).day ?? 1)
+        
+        var dayPlans: [DynamicDayPlan] = []
+        for index in 0..<dayCount {
+            if let dayDate = calendar.date(byAdding: .day, value: index, to: startDate) {
+                let baselineStops: [TripStop] = generateBaselineStops(destination: destination, dayIndex: index, dayDate: dayDate)
+                dayPlans.append(DynamicDayPlan(dayNumber: index + 1, date: dayDate, stops: baselineStops))
+            }
+        }
+        
+        let newTrip = DynamicTrip(
+            origin: origin,
+            destination: destination,
+            type: type,
+            startDate: startDate,
+            endDate: endDate,
+            budget: budget,
+            days: dayPlans
+        )
+        
+        self.currentTrip = newTrip
+        saveCurrentTripToDisk()
+    }
+
+    private func generateBaselineStops(destination: String, dayIndex: Int, dayDate: Date) -> [TripStop] {
+        let calendar = Calendar.current
+        let isLondon = destination.lowercased().contains("london")
+        let dayNumber = dayIndex + 1
+
+        let time1000 = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: dayDate) ?? dayDate
+        let time1130 = calendar.date(bySettingHour: 11, minute: 30, second: 0, of: dayDate) ?? dayDate
+        let time1330 = calendar.date(bySettingHour: 13, minute: 30, second: 0, of: dayDate) ?? dayDate
+        let time1400 = calendar.date(bySettingHour: 14, minute: 0, second: 0, of: dayDate) ?? dayDate
+        let time1530 = calendar.date(bySettingHour: 15, minute: 30, second: 0, of: dayDate) ?? dayDate
+        let time1600 = calendar.date(bySettingHour: 16, minute: 0, second: 0, of: dayDate) ?? dayDate
+        let time1900 = calendar.date(bySettingHour: 19, minute: 0, second: 0, of: dayDate) ?? dayDate
+        let time1930 = calendar.date(bySettingHour: 19, minute: 30, second: 0, of: dayDate) ?? dayDate
+
+        if isLondon {
+            if dayNumber == 1 {
+                return [
+                    TripStop(title: "Express Transit to Central Station", type: .transit, scheduledTime: time1000, durationMinutes: 45, estimatedCost: 25.0, isHardReservation: true, bookingReference: "LHR-EXP-01", notes: "Heathrow Express to Paddington"),
+                    TripStop(title: "Hotel Check-In & Unpack", type: .hotel, scheduledTime: time1130, durationMinutes: 45, estimatedCost: 0.0, isHardReservation: true, bookingReference: "HTL-LON-01", notes: "Central London Hotel Suite"),
+                    TripStop(title: "Covent Garden Walk", type: .activity, scheduledTime: time1400, durationMinutes: 120, estimatedCost: 0.0, isHardReservation: false, notes: "Street performers & market stroll"),
+                    TripStop(title: "Dinner in Soho", type: .dining, scheduledTime: time1900, durationMinutes: 90, estimatedCost: 45.0, isHardReservation: true, bookingReference: "RESV-SOHO-01", notes: "Confirmed evening reservation")
+                ]
+            } else if dayNumber == 2 {
+                return [
+                    TripStop(title: "British Museum Tour", type: .activity, scheduledTime: time1000, durationMinutes: 150, estimatedCost: 0.0, isHardReservation: true, bookingReference: "BM-TK-02", notes: "Rosetta Stone & ancient history galleries"),
+                    TripStop(title: "Lunch at Borough Market", type: .dining, scheduledTime: time1330, durationMinutes: 60, estimatedCost: 20.0, isHardReservation: false, notes: "Artisanal food stalls"),
+                    TripStop(title: "Westminster & Thames Walk", type: .activity, scheduledTime: time1530, durationMinutes: 90, estimatedCost: 0.0, isHardReservation: false, notes: "Big Ben, Parliament & South Bank"),
+                    TripStop(title: "Traditional Pub Dinner", type: .dining, scheduledTime: time1930, durationMinutes: 90, estimatedCost: 35.0, isHardReservation: false, notes: "Classic fish & chips at historical tavern")
+                ]
+            } else {
+                return [
+                    TripStop(title: "Hyde Park & Kensington Gardens", type: .activity, scheduledTime: time1000, durationMinutes: 120, estimatedCost: 0.0, isHardReservation: false, notes: "Serpentine lake & palace grounds"),
+                    TripStop(title: "Local Cafe Stop", type: .dining, scheduledTime: time1330, durationMinutes: 60, estimatedCost: 15.0, isHardReservation: false, notes: "Afternoon tea & pastries"),
+                    TripStop(title: "Return Airport Transit", type: .transit, scheduledTime: time1600, durationMinutes: 60, estimatedCost: 25.0, isHardReservation: true, bookingReference: "LHR-RET-03", notes: "Express return transfer")
+                ]
+            }
+        } else {
+            // Tokyo / General Default Destination Baseline
+            if dayNumber == 1 {
+                return [
+                    TripStop(title: "N'EX Express to Tokyo Station", type: .transit, scheduledTime: time1000, durationMinutes: 45, estimatedCost: 25.0, isHardReservation: true, bookingReference: "NEX-TYO-01", notes: "Narita Express transfer to city center"),
+                    TripStop(title: "Hotel Check-In & Unpack", type: .hotel, scheduledTime: time1130, durationMinutes: 45, estimatedCost: 0.0, isHardReservation: true, bookingReference: "HTL-TYO-01", notes: "Shinjuku luxury high-rise suite"),
+                    TripStop(title: "Shibuya Crossing & Harajuku Walk", type: .activity, scheduledTime: time1400, durationMinutes: 120, estimatedCost: 0.0, isHardReservation: false, notes: "World-famous intersection & Takeshita Street"),
+                    TripStop(title: "Ramen Dinner in Shinjuku", type: .dining, scheduledTime: time1900, durationMinutes: 90, estimatedCost: 45.0, isHardReservation: true, bookingReference: "RESV-TYO-01", notes: "Tonkotsu specialty ramen bar")
+                ]
+            } else if dayNumber == 2 {
+                return [
+                    TripStop(title: "Senso-ji Temple & Asakusa", type: .activity, scheduledTime: time1000, durationMinutes: 150, estimatedCost: 0.0, isHardReservation: false, notes: "Historic temple grounds & Nakamise-dori"),
+                    TripStop(title: "Lunch at Tsukiji Outer Market", type: .dining, scheduledTime: time1330, durationMinutes: 60, estimatedCost: 20.0, isHardReservation: false, notes: "Fresh sashimi & tamagoyaki"),
+                    TripStop(title: "Akihabara Tech & Anime Culture", type: .activity, scheduledTime: time1530, durationMinutes: 90, estimatedCost: 0.0, isHardReservation: false, notes: "Electric Town & gaming arcades"),
+                    TripStop(title: "Izakaya Dinner in Ginza", type: .dining, scheduledTime: time1930, durationMinutes: 90, estimatedCost: 35.0, isHardReservation: false, notes: "Yakitori & local craft beverages")
+                ]
+            } else {
+                return [
+                    TripStop(title: "Meiji Shrine & Yoyogi Park", type: .activity, scheduledTime: time1000, durationMinutes: 120, estimatedCost: 0.0, isHardReservation: false, notes: "Tranquil forest shrine walk"),
+                    TripStop(title: "Matcha Cafe Stop", type: .dining, scheduledTime: time1330, durationMinutes: 60, estimatedCost: 15.0, isHardReservation: false, notes: "Traditional Japanese green tea & sweets"),
+                    TripStop(title: "Return Narita Express Transit", type: .transit, scheduledTime: time1600, durationMinutes: 60, estimatedCost: 25.0, isHardReservation: true, bookingReference: "NEX-RET-03", notes: "Express Narita departure transfer")
+                ]
+            }
+        }
+    }
+
+    public func addStop(to dayIndex: Int, stop: TripStop) {
+        if var trip = currentTrip, trip.days.indices.contains(dayIndex) {
+            trip.days[dayIndex].stops.append(stop)
+            self.currentTrip = trip
+            saveCurrentTripToDisk()
+        }
+
+        guard activeTrip.days.indices.contains(dayIndex) else { return }
+        let category: ItemCategory
+        switch stop.type {
+        case .dining: category = .dining
+        case .hotel: category = .stay
+        case .transit, .flight: category = .transit
+        case .activity: category = .sightseeing
+        }
+
+        let item = ItineraryItem(
+            title: stop.title,
+            subtitle: stop.bookingReference ?? stop.notes ?? "User Stop",
+            startTime: stop.scheduledTime,
+            endTime: stop.scheduledTime.addingTimeInterval(TimeInterval(stop.durationMinutes * 60)),
+            location: activeTrip.destination,
+            category: category,
+            estimatedCost: Decimal(stop.estimatedCost),
+            isCompleted: false,
+            notes: stop.notes
+        )
+
+        mutate("add trip stop") { trip in
+            trip.days[dayIndex].items.append(item)
+            recalculateSpentAmount(for: dayIndex, in: trip)
+            rebalanceBudgetInternal(for: dayIndex, in: trip)
+        }
+    }
+
+    public func clearCurrentTrip() {
+        self.currentTrip = nil
+        UserDefaults.standard.removeObject(forKey: "waypoint_active_user_trip_v1")
+    }
+
+    private func saveCurrentTripToDisk() {
+        guard let trip = currentTrip,
+              let data = try? JSONEncoder().encode(trip) else { return }
+        UserDefaults.standard.set(data, forKey: "waypoint_active_user_trip_v1")
     }
 
     func recordBooking(for item: ItineraryItem) {

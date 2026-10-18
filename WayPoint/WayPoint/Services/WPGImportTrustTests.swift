@@ -131,15 +131,8 @@ final class WPGImportTrustTests {
 
     // MARK: - Test D: Pass Vault QR Generation Integrity
     private func testD_PassVaultQRGenerationIntegrity() async -> TestResult {
-        let sampleBooking = Booking.samplePasses.first ?? Booking(
-            title: "Haneda Airport Express",
-            provider: "ANA All Nippon Airways",
-            confirmationCode: "NH105-JL789",
-            type: .flight
-        )
-
-        let modalView = QRPassModalView(booking: sampleBooking)
-        let qrImage = modalView.generateVectorQRCode(from: sampleBooking.confirmationCode)
+        let code = "NH105-JL789"
+        let qrImage = PassBarcodeGenerator.generateQRCode(from: code)
 
         let qrValid = (qrImage != nil)
 

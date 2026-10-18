@@ -2,6 +2,8 @@
 //  BrandHeaderView.swift
 //  WayPoint
 //
+//  Phase 2: Native Apple HIG Brand Navigation Header
+//
 
 import SwiftUI
 #if canImport(UIKit)
@@ -32,25 +34,24 @@ struct BrandHeaderView: View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [WayPointTheme.cyanGlow, Color(red: 0.6, green: 0.4, blue: 1.0)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(Color(uiColor: .systemBlue))
                     .frame(width: height, height: height)
-                    .shadow(color: WayPointTheme.cyanGlow.opacity(0.4), radius: 10, x: 0, y: 2)
 
                 Image(systemName: "location.north.fill")
-                    .font(.system(size: height * 0.48, weight: .bold))
-                    .foregroundColor(.black)
+                    .font(.system(size: height * 0.46, weight: .bold))
+                    .foregroundColor(.white)
             }
 
-            Text("WAYPOINT")
-                .font(.system(size: height * 0.65, weight: .bold, design: .rounded))
-                .tracking(3)
-                .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("WAYPOINT")
+                    .font(.system(size: height * 0.58, weight: .bold, design: .default))
+                    .tracking(2)
+                    .foregroundColor(Color.primary)
+                Text("TRAVEL RESILIENCE")
+                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .tracking(1)
+                    .foregroundColor(Color.secondary)
+            }
         }
     }
 }

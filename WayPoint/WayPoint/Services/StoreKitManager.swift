@@ -63,11 +63,15 @@ public struct ProductDescriptor: Identifiable, Equatable {
 public final class StoreKitManager: ObservableObject {
     public static let shared = StoreKitManager()
 
-    public static let weeklyProductID = "com.waypoint.weekly"
-    public static let annualProductID = "com.waypoint.annual"
+    public static let monthlyProductID = WayPointProductIdentifier.monthlyPro
+    public static let weeklyProductID = WayPointProductIdentifier.monthlyPro
+    public static let annualProductID = WayPointProductIdentifier.annualPro
+    public static let lifetimeProductID = WayPointProductIdentifier.lifetimePro
     public static let subscriptionGroup = "WayPointProGroup"
 
-    public let productIDs: Set<String> = [weeklyProductID, annualProductID]
+    private let keychainProKey = "waypoint_is_pro_user_keychain_cache"
+
+    public let productIDs: Set<String> = WayPointProductIdentifier.all
 
     @Published public var isProSubscribed: Bool = false
     @Published public var loadedProducts: [Product] = []
@@ -80,8 +84,8 @@ public final class StoreKitManager: ObservableObject {
     /// Static Catalog Descriptors for StoreKit 2 Product Catalog Validation
     public static let productCatalog: [ProductDescriptor] = [
         ProductDescriptor(
-            id: weeklyProductID,
-            displayName: "WayPoint Weekly Pro",
+            id: monthlyProductID,
+            displayName: "WayPoint Monthly Pro",
             displayPrice: "$2.99",
             price: 2.99,
             subscriptionGroup: subscriptionGroup,
@@ -96,10 +100,23 @@ public final class StoreKitManager: ObservableObject {
             subscriptionGroup: subscriptionGroup,
             recurringPeriod: "P1Y",
             trialPeriod: "P7D"
+        ),
+        ProductDescriptor(
+            id: lifetimeProductID,
+            displayName: "WayPoint Lifetime Pro",
+            displayPrice: "$14.99",
+            price: 14.99,
+            subscriptionGroup: subscriptionGroup,
+            recurringPeriod: "P99Y",
+            trialPeriod: nil
         )
     ]
 
     private init() {
+        // Read cached entitlement status from Keychain for offline capability
+        if let cachedState = KeychainService.shared.readString(forKey: keychainProKey) {
+            self.isProSubscribed = (cachedState == "true")
+        }
         self.transactionListenerTask = listenForTransactions()
         Task {
             await checkEntitlements()
@@ -225,6 +242,7 @@ public final class StoreKitManager: ObservableObject {
 
         self.isProSubscribed = hasActivePro
         SubscriptionManager.shared.isProMember = hasActivePro
+        KeychainService.shared.saveString(hasActivePro ? "true" : "false", forKey: keychainProKey)
     }
 
     /// Updates internal subscription state based on verified transaction
@@ -235,6 +253,7 @@ public final class StoreKitManager: ObservableObject {
 
         self.isProSubscribed = isValid
         SubscriptionManager.shared.isProMember = isValid
+        KeychainService.shared.saveString(isValid ? "true" : "false", forKey: keychainProKey)
         print("[StoreKitManager] Subscription state updated: isProSubscribed = \(isValid) (product: '\(transaction.productID)').")
     }
 
@@ -242,5 +261,6 @@ public final class StoreKitManager: ObservableObject {
     public func setEntitlementStateForTesting(isSubscribed: Bool) {
         self.isProSubscribed = isSubscribed
         SubscriptionManager.shared.isProMember = isSubscribed
+        KeychainService.shared.saveString(isSubscribed ? "true" : "false", forKey: keychainProKey)
     }
 }

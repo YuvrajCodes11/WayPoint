@@ -1,342 +1,222 @@
-//
-//  ItineraryMapView.swift
-//  WayPoint
-//
-//  Task 4.1 / WP6: MapKit Navigation, Null Island Guard & Route Safety
-//
-
 import SwiftUI
 import MapKit
 
+enum MapViewMode: String, CaseIterable {
+    case cityMap = "City Map"
+    case transitRadar = "Transit Network"
+}
+
 struct ItineraryMapView: View {
     @Environment(TripStore.self) private var tripStore
-    @State private var selectedItem: ItineraryItem? = nil
+    @State private var viewMode: MapViewMode = .cityMap
     @State private var selectedStopIndex: Int = 0
     @State private var position: MapCameraPosition = .automatic
-    @State private var locationService = LocationService.shared
-    @State private var directionError: String? = nil
     @State private var activeRouteStop: ItineraryItem? = nil
-    @State private var openMapsToast: String? = nil
 
-    private var currentDayPlan: DayPlan {
-        tripStore.currentDayPlan
+    private var currentItems: [ItineraryItem] {
+        if let dynamic = tripStore.currentTrip, dynamic.days.indices.contains(tripStore.selectedDayIndex) {
+            let dayStops = dynamic.days[tripStore.selectedDayIndex].stops
+            return dayStops.map { stop in
+                ItineraryItem(
+                    title: stop.title,
+                    subtitle: stop.bookingReference ?? stop.notes ?? "Scheduled Stop",
+                    startTime: stop.scheduledTime,
+                    endTime: stop.scheduledTime.addingTimeInterval(TimeInterval(stop.durationMinutes * 60)),
+                    location: dynamic.destination,
+                    category: stop.type == .dining ? .dining : (stop.type == .hotel ? .stay : .sightseeing),
+                    estimatedCost: Decimal(stop.estimatedCost),
+                    coordinate: coordinateForStop(stop.title, city: dynamic.destination)
+                )
+            }
+        }
+        return tripStore.currentDayPlan.items
     }
 
-    private var coordinates: [CLLocationCoordinate2D] {
-        currentDayPlan.items.compactMap { item in
-            if let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) {
-                return CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
-            }
-            return nil
-        }
+    private var activeSelectedItem: ItineraryItem? {
+        currentItems.indices.contains(selectedStopIndex) ? currentItems[selectedStopIndex] : currentItems.first
     }
 
     var body: some View {
-        ZStack {
-            // Layer 1: Native Interactive Map View
-            Map(position: $position, selection: $selectedItem) {
-                UserAnnotation()
+        ZStack(alignment: .top) {
+            // LAYER 1: BASE MAP VIEW
+            if viewMode == .cityMap {
+                // REAL NATIVE APPLE MAPKIT
+                Map(position: $position) {
+                    ForEach(Array(currentItems.enumerated()), id: \.offset) { index, item in
+                        if let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) {
+                            Annotation(item.title, coordinate: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)) {
+                                ZStack {
+                                    Circle()
+                                        .fill(selectedStopIndex == index ? WayPointTheme.sapphireAccent : Color.black.opacity(0.8))
+                                        .frame(width: 36, height: 36)
+                                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                                        .shadow(radius: 6)
 
-                if coordinates.count > 1 {
-                    MapPolyline(coordinates: coordinates)
-                        .stroke(WayPointTheme.sapphireAccent, lineWidth: 3.5)
-                }
-
-                ForEach(Array(currentDayPlan.items.enumerated()), id: \.element.id) { index, item in
-                    if let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) {
-                        Annotation(
-                            item.title,
-                            coordinate: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
-                        ) {
-                            MapMarkerPin(item: item, isSelected: selectedItem?.id == item.id)
+                                    Image(systemName: item.category.systemImage)
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(.white)
+                                }
+                                .scaleEffect(selectedStopIndex == index ? 1.25 : 1.0)
                                 .onTapGesture {
-                                    #if canImport(UIKit)
-                                    UISelectionFeedbackGenerator().selectionChanged()
-                                    #endif
-                                    withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
-                                        selectedItem = item
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                         selectedStopIndex = index
-                                        updateCameraPosition(for: item)
+                                        updateCamera(for: item)
                                     }
                                 }
+                            }
                         }
                     }
                 }
-            }
-            .mapStyle(.standard(elevation: .realistic))
-            .mapControls {
-                MapCompass()
-                MapPitchToggle()
-                MapUserLocationButton()
+                .mapStyle(.standard(elevation: .realistic))
+                .ignoresSafeArea()
+            } else {
+                // OFFLINE SCHEMATIC TRANSIT NETWORK
+                OfflineTransitCanvasView()
+                    .ignoresSafeArea()
             }
 
-            // Layer 2: Top Header Overlay
-            VStack {
-                topHeaderOverlay
-                    .allowsHitTesting(true)
+            // LAYER 2: TOP HEADER WITH CLEAN MODE TOGGLE (NO OVERLAPPING HEADERS)
+            VStack(spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("City Navigation")
+                            .font(.system(size: 9.5, weight: .heavy, design: .monospaced))
+                            .tracking(1.2)
+                            .foregroundStyle(WayPointTheme.sapphireAccent)
 
-                if let mapsToast = openMapsToast {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.black)
-                        Text(mapsToast)
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.black)
+                        Text(tripStore.currentTrip?.destination ?? tripStore.activeTrip.destination)
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.white)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(WayPointTheme.emeraldRecovery, in: Capsule())
-                    .shadow(color: WayPointTheme.emeraldRecovery.opacity(0.4), radius: 10, x: 0, y: 4)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .padding(.top, 8)
+
+                    Spacer()
+
+                    Picker("Mode", selection: $viewMode) {
+                        Text("🗺️ Map").tag(MapViewMode.cityMap)
+                        Text("🚇 Transit").tag(MapViewMode.transitRadar)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 170)
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white.opacity(0.1), lineWidth: 1))
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
 
                 Spacer()
             }
-            .allowsHitTesting(false)
 
-            // Layer 3: Synchronized Paging Carousel Overlay (Prevent MapKit Touch Hijacking)
-            VStack {
-                Spacer()
-                pagingCardCarousel
+            // LAYER 3: BOTTOM STOP CAROUSEL OVERLAY
+            if viewMode == .cityMap && !currentItems.isEmpty {
+                VStack {
+                    Spacer()
+
+                    TabView(selection: $selectedStopIndex) {
+                        ForEach(Array(currentItems.enumerated()), id: \.offset) { index, item in
+                            bottomStopCard(item: item, index: index)
+                                .tag(index)
+                                .padding(.horizontal, 16)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(height: 140)
                     .padding(.bottom, 95)
-                    .allowsHitTesting(true)
+                }
             }
-            .allowsHitTesting(true)
-            .zIndex(100)
         }
-        .background(Color.clear)
-        .scrollContentBackground(.hidden)
         .preferredColorScheme(.dark)
         .onAppear {
-            if selectedItem == nil, let first = currentDayPlan.items.first {
-                selectedItem = first
-                selectedStopIndex = 0
+            if let first = currentItems.first {
+                updateCamera(for: first)
             }
-            updateCameraPosition(for: selectedItem)
         }
         .onChange(of: selectedStopIndex) { _, newIndex in
-            if currentDayPlan.items.indices.contains(newIndex) {
-                let targetItem = currentDayPlan.items[newIndex]
-                selectedItem = targetItem
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
-                    updateCameraPosition(for: targetItem)
-                }
+            if currentItems.indices.contains(newIndex) {
+                updateCamera(for: currentItems[newIndex])
             }
-        }
-        .onChange(of: tripStore.activeTrip.selectedDayIndex) {
-            selectedStopIndex = 0
-            selectedItem = currentDayPlan.items.first
-            updateCameraPosition(for: selectedItem)
-        }
-        .alert("Directions unavailable", isPresented: Binding(
-            get: { directionError != nil },
-            set: { if !$0 { directionError = nil } }
-        )) {
-            Button("OK", role: .cancel) { directionError = nil }
-        } message: {
-            Text(directionError ?? "")
         }
         .sheet(item: $activeRouteStop) { item in
             InAppRouteSheet(item: item)
         }
     }
 
-    // MARK: - Top Header Overlay
-
-    private var topHeaderOverlay: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("GPS RADAR & MAP")
-                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                    .tracking(1.4)
-                    .foregroundStyle(WayPointTheme.sapphireAccent)
-
-                Text(currentDayPlan.title)
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(WayPointTheme.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-
-            Spacer(minLength: 8)
-
-            Menu {
-                ForEach(Array(tripStore.activeTrip.days.enumerated()), id: \.element.id) { index, day in
-                    Button("Day \(index + 1): \(day.title)") {
-                        #if canImport(UIKit)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        #endif
-                        withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
-                            tripStore.selectDay(index)
-                            selectedStopIndex = 0
-                            selectedItem = tripStore.currentDayPlan.items.first
-                            updateCameraPosition(for: selectedItem)
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Text("Day \(tripStore.activeTrip.selectedDayIndex + 1)")
-                        .font(.caption.weight(.bold))
-                    Image(systemName: "chevron.down")
-                        .font(.caption2.weight(.bold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(WayPointTheme.sapphireAccent, in: Capsule())
-                .shadow(color: WayPointTheme.sapphireAccent.opacity(0.4), radius: 8, x: 0, y: 3)
-            }
-            .buttonStyle(.scalePress)
-            .fixedSize()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(WayPointTheme.hairlineStroke, lineWidth: 1))
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-    }
-
-    // MARK: - Synchronized Horizontal Paging Card Carousel Overlay
-
-    private var pagingCardCarousel: some View {
-        TabView(selection: $selectedStopIndex) {
-            ForEach(Array(currentDayPlan.items.enumerated()), id: \.offset) { index, item in
-                venueCard(item: item, index: index)
-                    .tag(index)
-                    .padding(.horizontal, 16)
-            }
-        }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        .frame(height: 140)
-    }
-
-    private func venueCard(item: ItineraryItem, index: Int) -> some View {
-        let isSelected = selectedItem?.id == item.id
-
-        return GlassCardView(
-            cornerRadius: 20,
-            padding: 14,
-            glowColor: isSelected ? WayPointTheme.sapphireAccent : .clear
-        ) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
-                            Text("STOP \(index + 1)")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundStyle(WayPointTheme.sapphireAccent)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(WayPointTheme.sapphireAccent.opacity(0.18), in: Capsule())
-
-                            Image(systemName: item.category.systemImage)
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(WayPointTheme.textSecondary)
-
-                            Text(item.category.displayName.uppercased())
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(WayPointTheme.textSecondary)
-                        }
-
-                        Text(item.title)
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(WayPointTheme.textPrimary)
-                            .lineLimit(1)
-
-                        Text(item.timeRange)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(WayPointTheme.textSecondary)
-                    }
-
-                    Spacer(minLength: 8)
-
-                    Button(action: {
-                        activeRouteStop = item
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                                .font(.caption.weight(.bold))
-                            Text("Directions")
-                                .font(.caption2.weight(.bold))
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(
-                            LinearGradient(
-                                colors: [WayPointTheme.sapphireAccent, WayPointTheme.emeraldRecovery],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            in: Capsule()
-                        )
-                        .shadow(color: WayPointTheme.sapphireAccent.opacity(0.4), radius: 8, x: 0, y: 3)
-                    }
-                    .buttonStyle(.scalePress)
-                }
-
-                HStack(spacing: 4) {
-                    Image(systemName: "mappin.and.ellipse")
-                        .font(.caption2)
+    private func bottomStopCard(item: ItineraryItem, index: Int) -> some View {
+        GlassCardView(cornerRadius: 18, padding: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("STOP \(index + 1)")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(WayPointTheme.sapphireAccent)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(WayPointTheme.sapphireAccent.opacity(0.18), in: Capsule())
 
-                    Text(item.location)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(WayPointTheme.textSecondary)
+                    Text(item.title)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
                         .lineLimit(1)
+
+                    Spacer()
+
+                    Button(action: { activeRouteStop = item }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                            Text("Directions")
+                        }
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(WayPointTheme.sapphireAccent, in: Capsule())
+                    }
+                }
+
+                HStack {
+                    Text(item.timeRange)
+                        .font(.caption)
+                        .foregroundStyle(Color.gray)
+                    Spacer()
+                    Text(item.formattedCost)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(WayPointTheme.cyanGlow)
                 }
             }
         }
     }
 
-    // MARK: - Camera & Routing Helpers
-
-    private func updateCameraPosition(for item: ItineraryItem?) {
-        if let item = item, let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) {
-            let clCoord = CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
-            let region = MKCoordinateRegion(
-                center: clCoord,
-                span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
-            )
-            position = .region(region)
-        } else if let userLoc = locationService.currentLocation?.coordinate {
-            let region = MKCoordinateRegion(
-                center: userLoc,
-                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-            )
-            position = .region(region)
-        } else if let firstCoord = coordinates.first {
-            let region = MKCoordinateRegion(
-                center: firstCoord,
-                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-            )
-            position = .region(region)
+    private func updateCamera(for item: ItineraryItem) {
+        if let coord = item.coordinate, LocationService.isValidCoordinate(latitude: coord.latitude, longitude: coord.longitude) {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                position = .region(MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude),
+                    span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                ))
+            }
         }
     }
-}
 
-// MARK: - Map Marker Pin
-
-private struct MapMarkerPin: View {
-    let item: ItineraryItem
-    let isSelected: Bool
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(isSelected ? WayPointTheme.sapphireAccent : WayPointTheme.cardSurface)
-                .frame(width: 38, height: 38)
-                .shadow(color: WayPointTheme.sapphireAccent.opacity(isSelected ? 0.6 : 0.2), radius: 8)
-
-            Image(systemName: item.category.systemImage)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(isSelected ? .white : WayPointTheme.sapphireAccent)
+    private func coordinateForStop(_ title: String, city: String) -> LocationCoordinate {
+        let t = title.lowercased()
+        if city.lowercased().contains("london") {
+            if t.contains("paddington") || t.contains("central station") { return LocationCoordinate(latitude: 51.5154, longitude: -0.1755) }
+            if t.contains("hotel") { return LocationCoordinate(latitude: 51.5136, longitude: -0.1365) }
+            if t.contains("covent garden") { return LocationCoordinate(latitude: 51.5117, longitude: -0.1232) }
+            if t.contains("soho") { return LocationCoordinate(latitude: 51.5126, longitude: -0.1270) }
+            if t.contains("museum") { return LocationCoordinate(latitude: 51.5194, longitude: -0.1270) }
+            if t.contains("borough") { return LocationCoordinate(latitude: 51.5055, longitude: -0.0910) }
+            if t.contains("westminster") { return LocationCoordinate(latitude: 51.5007, longitude: -0.1246) }
+            if t.contains("pub") { return LocationCoordinate(latitude: 51.5073, longitude: -0.1945) }
+            if t.contains("hyde park") { return LocationCoordinate(latitude: 51.5073, longitude: -0.1696) }
+            return LocationCoordinate(latitude: 51.5074, longitude: -0.1278) // Central London
+        } else {
+            if t.contains("shibuya") { return LocationCoordinate(latitude: 35.6580, longitude: 139.7016) }
+            if t.contains("hotel") { return LocationCoordinate(latitude: 35.6653, longitude: 139.7025) }
+            if t.contains("shinjuku") { return LocationCoordinate(latitude: 35.6909, longitude: 139.7003) }
+            if t.contains("ginza") { return LocationCoordinate(latitude: 35.6719, longitude: 139.7639) }
+            if t.contains("tokyo") { return LocationCoordinate(latitude: 35.6812, longitude: 139.7671) }
+            return LocationCoordinate(latitude: 35.6762, longitude: 139.6503)
         }
-        .scaleEffect(isSelected ? 1.2 : 1.0)
-        .animation(.spring(response: 0.38, dampingFraction: 0.8), value: isSelected)
     }
 }

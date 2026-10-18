@@ -28,6 +28,9 @@ struct HomeView: View {
     @State private var showSocialImportSheet = false
     @State private var showSharePulseSheet = false
     @State private var showCameraScannerSheet = false
+    @State private var selectedDynamicDayIndex: Int = 0
+    @State private var showAddStopSheet: Bool = false
+    @State private var showBudgetOptimizerSheet: Bool = false
 
     private var trip: Trip { tripStore.activeTrip }
 
@@ -53,75 +56,95 @@ struct HomeView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            backgroundLayer
+            Color.clear
                 .ignoresSafeArea()
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
-                    headerSection
-                    daySelectorSection
+                    if let dynamicTrip = tripStore.currentTrip {
+                        dynamicHeaderSection(dynamicTrip)
+                        dynamicBudgetTrackerSection(dynamicTrip)
+                        dynamicDaySelectorSection(dynamicTrip)
+                        dynamicTimelineSection(dynamicTrip)
+                    } else {
+                        headerSection
+                        daySelectorSection
 
-                    // Post-Pivot Success Banner on Home (when undo snapshot available for current day)
-                    if undoManager.canUndo(for: currentDayPlan.id) {
-                        postPivotConfirmationBanner
-                    }
-
-                    // Hero Disruption Recovery Banner & Panic Pivot CTA (Day 1 context sensitive)
-                    TripAtRiskCard(
-                        currentPlan: currentDayPlan,
-                        activeDisruption: trip.selectedDayIndex == 0 ? activeDisruption : nil,
-                        onTapPanicPivot: {
-                            showRecalculateSheet = true
-                        },
-                        onSelectDisruption: { type in
-                            activeDisruption = DisruptionEvent(type: type)
+                        // Post-Pivot Success Banner on Home (when undo snapshot available for current day)
+                        if undoManager.canUndo(for: currentDayPlan.id) {
+                            postPivotConfirmationBanner
                         }
-                    )
 
-                    timelineSection
+                        // Hero Disruption Recovery Banner & Panic Pivot CTA (Day 1 context sensitive)
+                        TripAtRiskCard(
+                            currentPlan: currentDayPlan,
+                            activeDisruption: trip.selectedDayIndex == 0 ? activeDisruption : nil,
+                            onTapPanicPivot: {
+                                showRecalculateSheet = true
+                            },
+                            onSelectDisruption: { type in
+                                activeDisruption = DisruptionEvent(type: type)
+                            }
+                        )
+
+                        timelineSection
+                    }
 
                     Color.clear
                         .frame(height: 120)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
                 .padding(.top, 12)
             }
             .scrollContentBackground(.hidden)
             .safeAreaInset(edge: .top) {
                 VStack(spacing: 8) {
-#if DEBUG
-                    if showDemoToolbar {
-                        ShipatonDemoToolbar(
-                            activeDisruption: $activeDisruption,
-                            isVisible: $showDemoToolbar,
-                            onTriggerPivotSheet: {
-                                showRecalculateSheet = true
-                            },
-                            onResetNominal: {
-                                tripStore.resetStoreWithFreshSample()
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 4)
-                    }
-#endif
-
                     if liveActivityManager.isActivityActive {
                         simulatedDynamicIslandPill
                             .transition(.move(edge: .top).combined(with: .opacity))
                             .padding(.top, 4)
                     }
                 }
-                .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8), value: showDemoToolbar)
                 .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8), value: liveActivityManager.isActivityActive)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             floatingRecalculateFAB
-                .padding(.bottom, 80)
+                .padding(.bottom, 100)
                 .allowsHitTesting(true)
         }
         .background(Color.clear)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(action: { activeDisruption = nil }) {
+                        Label("Nominal Day", systemImage: "sun.max")
+                    }
+                    Button(action: {
+                        activeDisruption = DisruptionEvent(type: .weatherRain)
+                        showRecalculateSheet = true
+                    }) {
+                        Label("Weather Defense", systemImage: "cloud.rain.fill")
+                    }
+                    Button(action: {
+                        activeDisruption = DisruptionEvent(type: .flightDelay)
+                        showRecalculateSheet = true
+                    }) {
+                        Label("Flight Rescue", systemImage: "airplane.departure")
+                    }
+                    Divider()
+                    Button(role: .destructive, action: {
+                        tripStore.resetStoreWithFreshSample()
+                    }) {
+                        Label("Reset Simulation Data", systemImage: "arrow.clockwise")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+        }
         .preferredColorScheme(.dark)
         .task { await tripStore.loadRemoteTripIfNoLocalState() }
         .sheet(isPresented: $showPaywall) {
@@ -149,6 +172,282 @@ struct HomeView: View {
         .sheet(item: $routeItem) { item in
             InAppRouteSheet(item: item)
         }
+        .sheet(isPresented: $showAddStopSheet) {
+            AddStopSheetView(dayIndex: selectedDynamicDayIndex)
+        }
+        .sheet(isPresented: $showBudgetOptimizerSheet) {
+            BudgetRebalanceSheet()
+        }
+    }
+
+    // MARK: - Dynamic User Trip Sections (Phase 2)
+
+    private func dynamicHeaderSection(_ trip: DynamicTrip) -> some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(trip.type.rawValue.uppercased())
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                    
+                    Text("\(trip.origin) → \(trip.destination)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.secondary)
+                }
+                
+                Text(trip.destination)
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.primary)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                        .font(.caption2.weight(.semibold))
+                    Text("\(trip.startDate.formatted(date: .abbreviated, time: .omitted)) – \(trip.endDate.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.caption.weight(.medium))
+                }
+                .foregroundStyle(Color.secondary)
+            }
+            
+            Spacer()
+        }
+    }
+
+    private func dynamicBudgetTrackerSection(_ trip: DynamicTrip) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Trip Budget")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.secondary)
+                    
+                    Text(formatCurrency(trip.budget.total, currencyCode: trip.budget.currencyCode))
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.primary)
+                }
+                
+                Spacer()
+                
+                Text(trip.budget.currencyCode)
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Color.primary.opacity(0.08)))
+            }
+            
+            HStack(spacing: 12) {
+                budgetCapPill(title: "Transit Cap", amount: trip.budget.transitLimit, currency: trip.budget.currencyCode, color: Color.accentColor)
+                budgetCapPill(title: "Stay Cap", amount: trip.budget.stayLimit, currency: trip.budget.currencyCode, color: Color.purple)
+                budgetCapPill(title: "Food Cap", amount: trip.budget.dailyFoodLimit, currency: trip.budget.currencyCode, color: Color.green)
+            }
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+        )
+    }
+
+    private func budgetCapPill(title: String, amount: Double, currency: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(WayPointTheme.textTertiary)
+            
+            Text(formatCurrency(amount, currencyCode: currency))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(WayPointTheme.obsidianSurface))
+    }
+
+    private func dynamicDaySelectorSection(_ trip: DynamicTrip) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(0..<trip.days.count, id: \.self) { index in
+                    Button(action: {
+                        selectedDynamicDayIndex = index
+                    }) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Day \(index + 1)")
+                                .font(.caption.weight(.bold))
+                            
+                            if trip.days.indices.contains(index) {
+                                Text(trip.days[index].date.formatted(date: .abbreviated, time: .omitted))
+                                    .font(.system(size: 9, weight: .semibold))
+                            }
+                        }
+                        .foregroundStyle(selectedDynamicDayIndex == index ? WayPointTheme.cyanGlow : WayPointTheme.textSecondary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            selectedDynamicDayIndex == index ? WayPointTheme.cyanGlow.opacity(0.18) : WayPointTheme.cardSurface,
+                            in: Capsule()
+                        )
+                        .overlay(
+                            Capsule().strokeBorder(selectedDynamicDayIndex == index ? WayPointTheme.cyanGlow : WayPointTheme.hairlineStroke, lineWidth: 1)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func dynamicTimelineSection(_ trip: DynamicTrip) -> some View {
+        let activeDayIndex = min(selectedDynamicDayIndex, max(0, trip.days.count - 1))
+        let currentDay = trip.days.indices.contains(activeDayIndex) ? trip.days[activeDayIndex] : nil
+        let stops = currentDay?.stops ?? []
+
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Day \(activeDayIndex + 1) Stops")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(WayPointTheme.textPrimary)
+
+                Spacer()
+
+                Button(action: { showAddStopSheet = true }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                        Text("Add Stop")
+                    }
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(WayPointTheme.cyanGlow)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(WayPointTheme.cyanGlow.opacity(0.15), in: Capsule())
+                }
+            }
+
+            if stops.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 36))
+                        .foregroundStyle(WayPointTheme.textTertiary)
+
+                    Text("No stops scheduled for Day \(activeDayIndex + 1)")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(WayPointTheme.textSecondary)
+
+                    Text("Tap '+' to add transit, stays, dining, or activities.")
+                        .font(.caption)
+                        .foregroundStyle(WayPointTheme.textTertiary)
+                        .multilineTextAlignment(.center)
+
+                    Button(action: { showAddStopSheet = true }) {
+                        Text("Add First Stop")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(WayPointTheme.cyanGlow))
+                    }
+                    .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(24)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(WayPointTheme.obsidianSurface)
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(WayPointTheme.glassBorder, lineWidth: 1))
+                )
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(stops) { stop in
+                        dynamicStopCard(stop, currencyCode: trip.budget.currencyCode)
+                    }
+                }
+            }
+        }
+    }
+
+    private func dynamicStopCard(_ stop: TripStop, currencyCode: String) -> some View {
+        HStack(spacing: 14) {
+            Circle()
+                .fill(stopColor(stop.type))
+                .frame(width: 36, height: 36)
+                .overlay(
+                    Image(systemName: stopIcon(stop.type))
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.black)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(stop.title)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(WayPointTheme.textPrimary)
+
+                    Spacer()
+
+                    Text(formatCurrency(stop.estimatedCost, currencyCode: currencyCode))
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundStyle(WayPointTheme.cyanGlow)
+                }
+
+                HStack(spacing: 8) {
+                    Text(stop.type.rawValue.capitalized)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(stopColor(stop.type))
+
+                    Text("•")
+                        .font(.caption2)
+                        .foregroundStyle(WayPointTheme.textTertiary)
+
+                    Text("\(stop.scheduledTime.formatted(date: .omitted, time: .shortened)) (\(stop.durationMinutes)m)")
+                        .font(.caption)
+                        .foregroundStyle(WayPointTheme.textSecondary)
+
+                    if stop.isHardReservation {
+                        Text("RESERVED")
+                            .font(.system(size: 9, weight: .heavy))
+                            .foregroundStyle(WayPointTheme.imperialGold)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(WayPointTheme.imperialGold.opacity(0.15)))
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(WayPointTheme.obsidianSurface)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(WayPointTheme.glassBorder, lineWidth: 1))
+        )
+    }
+
+    private func stopIcon(_ type: StopType) -> String {
+        switch type {
+        case .transit: return "car.fill"
+        case .hotel: return "bed.double.fill"
+        case .dining: return "fork.knife"
+        case .activity: return "ticket.fill"
+        case .flight: return "airplane"
+        }
+    }
+
+    private func stopColor(_ type: StopType) -> Color {
+        switch type {
+        case .transit: return WayPointTheme.sapphireAccent
+        case .hotel: return WayPointTheme.violetGlow
+        case .dining: return WayPointTheme.imperialGold
+        case .activity: return WayPointTheme.emeraldRecovery
+        case .flight: return WayPointTheme.cyanGlow
+        }
+    }
+
+    private func formatCurrency(_ amount: Double, currencyCode: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currencyCode
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: amount)) ?? "\(currencyCode) \(Int(amount))"
     }
 
     // MARK: - Post-Pivot Confirmation Banner
@@ -275,13 +574,37 @@ struct HomeView: View {
                         .minimumScaleFactor(0.8)
                         .layoutPriority(1)
 
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.caption2.weight(.semibold))
-                        Text(locationService.currentCityCountry == "Detecting location..." ? (trip.destination.isEmpty ? "Tokyo, Japan" : trip.destination) : locationService.currentCityCountry)
-                            .font(.caption.weight(.medium))
+                    Menu {
+                        ForEach(City.allCases) { city in
+                            Button(action: {
+                                Haptics.selection()
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    tripStore.activeCity = city
+                                }
+                            }) {
+                                HStack {
+                                    Text("\(city.flag) \(city.rawValue)")
+                                    if tripStore.activeCity == city {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.caption2.weight(.bold))
+                            Text("\(tripStore.activeCity.flag) \(tripStore.activeCity.rawValue)")
+                                .font(.caption.weight(.bold))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundStyle(WayPointTheme.cyanGlow)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(WayPointTheme.cyanGlow.opacity(0.12), in: Capsule())
+                        .overlay(Capsule().strokeBorder(WayPointTheme.cyanGlow.opacity(0.4), lineWidth: 1))
                     }
-                    .foregroundStyle(WayPointTheme.sapphireAccent)
                 }
 
                 Spacer()
@@ -511,6 +834,25 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
 
+                        Button(action: {
+                            showBudgetOptimizerSheet = true
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.caption2.weight(.bold))
+                                Text("Re-balance")
+                                    .font(.caption2.weight(.heavy))
+                            }
+                            .foregroundStyle(WayPointTheme.emeraldRecovery)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(WayPointTheme.emeraldRecovery.opacity(0.18), in: Capsule())
+                            .overlay(
+                                Capsule().strokeBorder(WayPointTheme.emeraldRecovery.opacity(0.5), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.scalePress)
+
                         budgetRing
                     }
                 }
@@ -612,21 +954,42 @@ struct HomeView: View {
 
                 Spacer()
 
-                Button(action: { showSocialImportSheet = true }) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "sparkles")
-                            .font(.caption2.weight(.bold))
-                        Text("Import / Paste Link")
-                            .font(.caption.weight(.bold))
+                HStack(spacing: 8) {
+                    Button(action: { showAddStopSheet = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.caption2.weight(.bold))
+                            Text("Add Stop")
+                                .font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(WayPointTheme.cyanGlow)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(WayPointTheme.cyanGlow.opacity(0.18), in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(WayPointTheme.cyanGlow.opacity(0.5), lineWidth: 1)
+                        )
                     }
-                    .foregroundStyle(WayPointTheme.cyanGlow)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(WayPointTheme.cyanGlow.opacity(0.18), in: Capsule())
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(WayPointTheme.cyanGlow.opacity(0.5), lineWidth: 1)
-                    )
+                    .buttonStyle(.scalePress)
+
+                    Button(action: { showSocialImportSheet = true }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "sparkles")
+                                .font(.caption2.weight(.bold))
+                            Text("Import")
+                                .font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(WayPointTheme.cyanGlow)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(WayPointTheme.cyanGlow.opacity(0.18), in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(WayPointTheme.cyanGlow.opacity(0.5), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
                 .buttonStyle(.plain)
             }
@@ -655,7 +1018,7 @@ struct HomeView: View {
         return Group {
             if isDisrupted {
                 Button(action: {
-                    showRecalculateSheet = true
+                    showBudgetOptimizerSheet = true
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: "bolt.fill")
@@ -682,7 +1045,11 @@ struct HomeView: View {
                 .accessibilityHint("Opens panic pivot sheet to resolve schedule disruption")
             } else {
                 Button(action: {
-                    showRecalculateSheet = true
+                    #if canImport(UIKit)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    #endif
+                    _ = tripStore.rebalanceBudget(for: currentDayPlan.id)
+                    showBudgetOptimizerSheet = true
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
@@ -905,22 +1272,15 @@ private struct TimelineCard: View {
     private var thumbnailImageView: some View {
         ZStack {
             if let photoURL = item.photoURL {
-                AsyncImage(url: photoURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure:
-                        placeholderImage
-                    case .empty:
-                        ZStack {
-                            WayPointTheme.obsidianElevated
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        }
-                    @unknown default:
-                        placeholderImage
+                OfflineCachedImage(url: photoURL, fallbackSystemName: "photo", nodeName: item.title) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    ZStack {
+                        WayPointTheme.obsidianElevated
+                        ProgressView()
+                            .scaleEffect(0.7)
                     }
                 }
             } else {

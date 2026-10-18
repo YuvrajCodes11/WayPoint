@@ -81,6 +81,13 @@ CREATE TABLE IF NOT EXISTS public.sync_revisions (
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 7. Waitlist Table (Anonymous Access Hardened - OWASP A01:2021)
+CREATE TABLE IF NOT EXISTS public.waitlist (
+    id UUID PRIMARY KEY DEFAULT gen_random_state_uuid(),
+    email TEXT NOT NULL UNIQUE CHECK (length(email) <= 254 AND email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- =====================================================================
 -- Performance & Composite Indexes
 -- =====================================================================
@@ -92,9 +99,10 @@ CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON public.bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_trip_id ON public.bookings(trip_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_user_trip ON public.expenses(user_id, trip_id);
 CREATE INDEX IF NOT EXISTS idx_sync_revisions_user_trip ON public.sync_revisions(user_id, trip_id);
+CREATE INDEX IF NOT EXISTS idx_waitlist_created_at ON public.waitlist(created_at DESC);
 
 -- =====================================================================
--- Row Level Security (RLS) Activation across all 6 Tables
+-- Row Level Security (RLS) Activation across all 7 Tables
 -- =====================================================================
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -103,6 +111,7 @@ ALTER TABLE public.itinerary_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_revisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.waitlist ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------
 -- RLS Policies for Profiles
@@ -193,3 +202,18 @@ CREATE POLICY "Users can update own sync_revisions" ON public.sync_revisions FOR
 
 DROP POLICY IF EXISTS "Users can delete own sync_revisions" ON public.sync_revisions;
 CREATE POLICY "Users can delete own sync_revisions" ON public.sync_revisions FOR DELETE USING (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------
+-- RLS Policies for Waitlist (OWASP A01:2021 Anti Data Leakage)
+-- ---------------------------------------------------------------------
+DROP POLICY IF EXISTS "Anonymous users can insert into waitlist" ON public.waitlist;
+CREATE POLICY "Anonymous users can insert into waitlist" ON public.waitlist 
+    FOR INSERT 
+    WITH CHECK (
+        length(email) <= 254 AND 
+        email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    );
+
+-- NOTE: No SELECT, UPDATE, or DELETE policies exist for public/anon/authenticated roles on public.waitlist.
+-- This guarantees that subscriber emails CANNOT be queried or harvested by anonymous web clients.
+

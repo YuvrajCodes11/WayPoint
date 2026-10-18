@@ -1,0 +1,262 @@
+{
+  "networkName": "London Underground Network",
+  "version": "1.0",
+  "stations": [
+    {
+      "id": "paddington",
+      "name": "Paddington",
+      "japaneseName": "Paddington",
+      "lineId": "Bakerloo",
+      "lineName": "Bakerloo & Circle Lines",
+      "lineColorHex": "#B56300",
+      "xRatio": 0.15,
+      "yRatio": 0.45,
+      "latitude": 51.5154,
+      "longitude": -0.1755
+    },
+    {
+      "id": "baker-street",
+      "name": "Baker Street",
+      "japaneseName": "Baker Street",
+      "lineId": "Bakerloo",
+      "lineName": "Bakerloo & Jubilee Hub",
+      "lineColorHex": "#B56300",
+      "xRatio": 0.32,
+      "yRatio": 0.35,
+      "latitude": 51.5226,
+      "longitude": -0.1571
+    },
+    {
+      "id": "oxford-circus",
+      "name": "Oxford Circus",
+      "japaneseName": "Oxford Circus",
+      "lineId": "Central",
+      "lineName": "Central & Victoria Hub",
+      "lineColorHex": "#E32017",
+      "xRatio": 0.45,
+      "yRatio": 0.50,
+      "latitude": 51.5152,
+      "longitude": -0.1418
+    },
+    {
+      "id": "piccadilly-circus",
+      "name": "Piccadilly Circus",
+      "japaneseName": "Piccadilly Circus",
+      "lineId": "Piccadilly",
+      "lineName": "Piccadilly & Bakerloo",
+      "lineColorHex": "#0019A8",
+      "xRatio": 0.48,
+      "yRatio": 0.58,
+      "latitude": 51.5101,
+      "longitude": -0.1342
+    },
+    {
+      "id": "charing-cross",
+      "name": "Charing Cross",
+      "japaneseName": "Charing Cross",
+      "lineId": "Northern",
+      "lineName": "Northern Line",
+      "lineColorHex": "#000000",
+      "xRatio": 0.52,
+      "yRatio": 0.64,
+      "latitude": 51.5074,
+      "longitude": -0.1272
+    },
+    {
+      "id": "westminster",
+      "name": "Westminster (Big Ben)",
+      "japaneseName": "Westminster",
+      "lineId": "Jubilee",
+      "lineName": "Jubilee & District",
+      "lineColorHex": "#A0A5A9",
+      "xRatio": 0.55,
+      "yRatio": 0.72,
+      "latitude": 51.5010,
+      "longitude": -0.1254
+    },
+    {
+      "id": "waterloo",
+      "name": "Waterloo",
+      "japaneseName": "Waterloo",
+      "lineId": "Jubilee",
+      "lineName": "Jubilee & Northern Hub",
+      "lineColorHex": "#A0A5A9",
+      "xRatio": 0.65,
+      "yRatio": 0.75,
+      "latitude": 51.5033,
+      "longitude": -0.1147
+    },
+    {
+      "id": "kings-cross",
+      "name": "King's Cross St. Pancras",
+      "japaneseName": "King's Cross",
+      "lineId": "Victoria",
+      "lineName": "Victoria & Northern Hub",
+      "lineColorHex": "#0098D4",
+      "xRatio": 0.52,
+      "yRatio": 0.22,
+      "latitude": 51.5308,
+      "longitude": -0.1238
+    },
+    {
+      "id": "holborn",
+      "name": "Holborn",
+      "japaneseName": "Holborn",
+      "lineId": "Central",
+      "lineName": "Central & Piccadilly",
+      "lineColorHex": "#E32017",
+      "xRatio": 0.60,
+      "yRatio": 0.45,
+      "latitude": 51.5174,
+      "longitude": -0.1200
+    },
+    {
+      "id": "bank",
+      "name": "Bank / Monument",
+      "japaneseName": "Bank",
+      "lineId": "Central",
+      "lineName": "Central & Northern Hub",
+      "lineColorHex": "#E32017",
+      "xRatio": 0.78,
+      "yRatio": 0.52,
+      "latitude": 51.5134,
+      "longitude": -0.0886
+    },
+    {
+      "id": "tower-hill",
+      "name": "Tower Hill (Tower Bridge)",
+      "japaneseName": "Tower Hill",
+      "lineId": "District",
+      "lineName": "District & Circle Line",
+      "lineColorHex": "#00782A",
+      "xRatio": 0.88,
+      "yRatio": 0.56,
+      "latitude": 51.5098,
+      "longitude": -0.0766
+    },
+    {
+      "id": "victoria",
+      "name": "Victoria Station",
+      "japaneseName": "Victoria",
+      "lineId": "Victoria",
+      "lineName": "Victoria & District Hub",
+      "lineColorHex": "#0098D4",
+      "xRatio": 0.42,
+      "yRatio": 0.78,
+      "latitude": 51.4965,
+      "longitude": -0.1447
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_pad_bak",
+      "fromStationId": "paddington",
+      "toStationId": "baker-street",
+      "lineId": "Bakerloo",
+      "lineName": "Bakerloo Line",
+      "lineColorHex": "#B56300",
+      "travelTimeSeconds": 180,
+      "isTransfer": false
+    },
+    {
+      "id": "e_bak_oxf",
+      "fromStationId": "baker-street",
+      "toStationId": "oxford-circus",
+      "lineId": "Bakerloo",
+      "lineName": "Bakerloo Line",
+      "lineColorHex": "#B56300",
+      "travelTimeSeconds": 140,
+      "isTransfer": false
+    },
+    {
+      "id": "e_oxf_pic",
+      "fromStationId": "oxford-circus",
+      "toStationId": "piccadilly-circus",
+      "lineId": "Bakerloo",
+      "lineName": "Bakerloo Line",
+      "lineColorHex": "#B56300",
+      "travelTimeSeconds": 110,
+      "isTransfer": false
+    },
+    {
+      "id": "e_pic_cha",
+      "fromStationId": "piccadilly-circus",
+      "toStationId": "charing-cross",
+      "lineId": "Bakerloo",
+      "lineName": "Bakerloo Line",
+      "lineColorHex": "#B56300",
+      "travelTimeSeconds": 120,
+      "isTransfer": false
+    },
+    {
+      "id": "e_cha_wes",
+      "fromStationId": "charing-cross",
+      "toStationId": "westminster",
+      "lineId": "District",
+      "lineName": "District Line",
+      "lineColorHex": "#00782A",
+      "travelTimeSeconds": 130,
+      "isTransfer": false
+    },
+    {
+      "id": "e_wes_wat",
+      "fromStationId": "westminster",
+      "toStationId": "waterloo",
+      "lineId": "Jubilee",
+      "lineName": "Jubilee Line",
+      "lineColorHex": "#A0A5A9",
+      "travelTimeSeconds": 120,
+      "isTransfer": false
+    },
+    {
+      "id": "e_kgx_oxf",
+      "fromStationId": "kings-cross",
+      "toStationId": "oxford-circus",
+      "lineId": "Victoria",
+      "lineName": "Victoria Line",
+      "lineColorHex": "#0098D4",
+      "travelTimeSeconds": 240,
+      "isTransfer": false
+    },
+    {
+      "id": "e_oxf_vic",
+      "fromStationId": "oxford-circus",
+      "toStationId": "victoria",
+      "lineId": "Victoria",
+      "lineName": "Victoria Line",
+      "lineColorHex": "#0098D4",
+      "travelTimeSeconds": 160,
+      "isTransfer": false
+    },
+    {
+      "id": "e_oxf_hol",
+      "fromStationId": "oxford-circus",
+      "toStationId": "holborn",
+      "lineId": "Central",
+      "lineName": "Central Line",
+      "lineColorHex": "#E32017",
+      "travelTimeSeconds": 150,
+      "isTransfer": false
+    },
+    {
+      "id": "e_hol_bnk",
+      "fromStationId": "holborn",
+      "toStationId": "bank",
+      "lineId": "Central",
+      "lineName": "Central Line",
+      "lineColorHex": "#E32017",
+      "travelTimeSeconds": 180,
+      "isTransfer": false
+    },
+    {
+      "id": "e_bnk_tow",
+      "fromStationId": "bank",
+      "toStationId": "tower-hill",
+      "lineId": "District",
+      "lineName": "District Line",
+      "lineColorHex": "#00782A",
+      "travelTimeSeconds": 140,
+      "isTransfer": false
+    }
+  ]
+}

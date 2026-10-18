@@ -92,11 +92,11 @@ struct WayPointLiveActivityWidget: Widget {
 
                             Spacer()
 
-                            // Panic Pivot Indicator Badge
+                            // Reroute Indicator Badge
                             HStack(spacing: 4) {
                                 Image(systemName: "sparkles")
                                     .font(.system(size: 8, weight: .bold))
-                                Text("Panic Pivot Ready")
+                                Text("Reroute Ready")
                                     .font(.system(size: 9, weight: .bold))
                             }
                             .foregroundStyle(WayPointTheme.obsidian)
@@ -226,7 +226,7 @@ struct WayPointLiveActivityWidget: Widget {
                     HStack(spacing: 4) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 9, weight: .bold))
-                        Text("Panic Pivot")
+                        Text("Reroute Plan")
                             .font(.caption2.weight(.bold))
                     }
                     .foregroundStyle(WayPointTheme.obsidian)

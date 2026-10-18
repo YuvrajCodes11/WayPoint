@@ -1,0 +1,96 @@
+{
+  "identifier" : "WayPointProductsConfig",
+  "nonRenewingSubscriptions" : [ ],
+  "products" : [
+    {
+      "displayPrice" : "99.99",
+      "familyShareable" : true,
+      "internalID" : "com.waypoint.pro.lifetime",
+      "localizations" : [
+        {
+          "description" : "Unlimited Lifetime Pass to all WayPoint Pro features",
+          "displayName" : "WayPoint Lifetime Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.waypoint.pro.lifetime",
+      "referenceName" : "Lifetime Pro",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [ ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "WayPointProGroup",
+      "localizations" : [
+        {
+          "description" : "Access all WayPoint Pro travel planning features.",
+          "displayName" : "WayPoint Pro Subscription",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "WayPointProGroup",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "com.waypoint.pro.monthly",
+          "introductoryOffer" : {
+            "internalID" : "intro_monthly_7d_trial",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P7D"
+          },
+          "localizations" : [
+            {
+              "description" : "Monthly Pro Access with 7-day Free Trial",
+              "displayName" : "WayPoint Monthly Pro",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.waypoint.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Monthly Pro",
+          "subscriptionGroupID" : "WayPointProGroup",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "39.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "com.waypoint.pro.annual",
+          "introductoryOffer" : {
+            "internalID" : "intro_annual_14d_trial",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P14D"
+          },
+          "localizations" : [
+            {
+              "description" : "Annual Pro Access with 14-day Free Trial",
+              "displayName" : "WayPoint Annual Pro",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.waypoint.pro.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Annual Pro",
+          "subscriptionGroupID" : "WayPointProGroup",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

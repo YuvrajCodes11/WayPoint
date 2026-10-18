@@ -8,12 +8,20 @@
 import Foundation
 
 public struct StoreKitConfig {
+    public static var monthlyProductID: String {
+        WayPointProductIdentifier.monthlyPro
+    }
+
     public static var weeklyProductID: String {
-        ProcessInfo.processInfo.environment["STOREKIT_WEEKLY_PRODUCT_ID"] ?? "com.waypoint.weekly"
+        WayPointProductIdentifier.monthlyPro
     }
 
     public static var annualProductID: String {
-        ProcessInfo.processInfo.environment["STOREKIT_ANNUAL_PRODUCT_ID"] ?? "com.waypoint.annual"
+        WayPointProductIdentifier.annualPro
+    }
+
+    public static var lifetimeProductID: String {
+        WayPointProductIdentifier.lifetimePro
     }
 
     public static var subscriptionGroupID: String {

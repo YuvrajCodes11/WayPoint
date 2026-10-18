@@ -1,4 +1,4 @@
-//
+
 //  ScaleButtonStyle.swift
 //  WayPoint
 //

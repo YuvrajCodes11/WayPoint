@@ -10,7 +10,16 @@ xcuserdata/
 *.xcworkspace/xcuserdata/
 *.xcuserdatad
 .vscode/
+*.zip
 
-# Private API Keys (if any exist)
+# Private API Keys & Environment Variables (Zero Secret Leakage)
 Secrets.plist
 .env
+.env*.local
+.env.production
+.env.staging
+.env.development
+*.pem
+*.key
+credentials.json
+

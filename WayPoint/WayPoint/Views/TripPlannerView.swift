@@ -22,6 +22,7 @@ public struct TripPlannerView: View {
     @State private var executionTickerText: String = "0.45 ms"
     @State private var isRerouted: Bool = false
     @State private var testAuditResult: String? = nil
+    @State private var showAddedToast: Bool = false
     
     public init(router: BudgetGraphRouter = BudgetGraphRouter.shared) {
         self.router = router
@@ -219,7 +220,7 @@ public struct TripPlannerView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.shield.fill")
                         .foregroundColor(.orange)
-                    Text("PANIC PIVOT ACTIVE: Station '\(avoidedStation.name)' Blocked. Detour Engaged.")
+                    Text("REROUTE ACTIVE: Station '\(avoidedStation.name)' Blocked. Detour Engaged.")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.orange)
                 }
@@ -320,6 +321,33 @@ public struct TripPlannerView: View {
                             )
                         }
                     }
+                    
+                    Button(action: addRouteToDayItinerary) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.square.fill.on.square.fill")
+                                .font(.system(size: 14, weight: .bold))
+                            Text("Add to Day Itinerary")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                        }
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule().fill(Color(red: 0.0, green: 1.0, blue: 0.53))
+                        )
+                    }
+                    .padding(.top, 6)
+
+                    if showAddedToast {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Color.green)
+                            Text("Transit Stop added to active trip itinerary!")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.green)
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
                 .padding(14)
                 .background(RoundedRectangle(cornerRadius: 16).fill(Color(white: 0.1)))
@@ -332,6 +360,36 @@ public struct TripPlannerView: View {
     }
     
     // MARK: - Actions & Benchmarking
+    private func addRouteToDayItinerary() {
+        guard let plan = router.currentPlan else { return }
+        
+        let originName = router.stations.first(where: { $0.id == originId })?.name ?? originId.capitalized
+        let destName = router.stations.first(where: { $0.id == destinationId })?.name ?? destinationId.capitalized
+        let line = plan.legs.first?.connection.lineName ?? "Transit Line"
+        
+        let transitStop = TripStop(
+            title: "\(originName) → \(destName) (\(line))",
+            type: .transit,
+            scheduledTime: TripStore.shared.currentTrip?.days.first?.date ?? Date(),
+            durationMinutes: plan.totalTimeSeconds / 60,
+            estimatedCost: Double(plan.totalFareCents) / 100.0,
+            isHardReservation: false,
+            notes: "Transfers: \(plan.legs.count - 1) | Mode: \(prioritizeSpeed ? "Fastest" : "Budget Saver")"
+        )
+        
+        TripStore.shared.addStop(to: 0, stop: transitStop)
+        
+        withAnimation {
+            showAddedToast = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            withAnimation {
+                showAddedToast = false
+            }
+        }
+    }
+
     private func generateItinerary() {
         let plan = router.findOptimalTrip(
             from: originId,

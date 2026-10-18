@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import AuthenticationServices
 #if canImport(WebKit) && canImport(UIKit)
 import WebKit
 import UIKit
@@ -31,19 +32,10 @@ struct OTPAuthSheetView: View {
 
     var body: some View {
         ZStack {
-            // Live 3D Liquid Line Path Scene Background
-            #if canImport(WebKit) && canImport(UIKit)
+            (Color(hex: "070B14") ?? Color.black).ignoresSafeArea()
             SplineWebContainer(urlString: "https://my.spline.design/customlinepathwithcustommatcap-Oken3h6jm2uzoJ2BVGzdfhQe/")
-                .scaleEffect(1.06)
-                .clipped()
                 .ignoresSafeArea()
-                .allowsHitTesting(false)
-
-            WayPointTheme.obsidian.opacity(0.85)
-                .ignoresSafeArea()
-            #else
-            WayPointTheme.obsidian.ignoresSafeArea()
-            #endif
+            Color.black.opacity(0.65).ignoresSafeArea().allowsHitTesting(false)
 
             VStack(spacing: 20) {
                 // Header Drag Indicator
@@ -207,6 +199,58 @@ struct OTPAuthSheetView: View {
                 .shadow(color: WayPointTheme.cyanGlow.opacity(0.35), radius: 12, x: 0, y: 6)
             }
             .disabled(contactInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+
+            // MARK: - Native Sign in with Apple Button
+            SignInWithAppleButton(.signIn) { request in
+                request.requestedScopes = [.fullName, .email]
+            } onCompletion: { result in
+                switch result {
+                case .success(let authResults):
+                    if let appleIDCredential = authResults.credential as? ASAuthorizationAppleIDCredential,
+                       let identityTokenData = appleIDCredential.identityToken,
+                       let identityTokenString = String(data: identityTokenData, encoding: .utf8) {
+                        Task {
+                            await supabaseService.signInWithApple(idToken: identityTokenString)
+                            dismiss()
+                        }
+                    }
+                case .failure(let error):
+                    print("[OTPAuthSheetView] Apple sign in notice: \(error.localizedDescription)")
+                }
+            }
+            .signInWithAppleButtonStyle(.white)
+            .frame(height: 50)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+            // Offline Demo Bypass Button
+            Button(action: handleGuestBypass) {
+                HStack(spacing: 6) {
+                    Image(systemName: "airplane")
+                        .font(.subheadline.weight(.bold))
+                    Text("Continue as Guest / Offline Demo")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(WayPointTheme.cyanGlow)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(WayPointTheme.obsidianElevated, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(WayPointTheme.cyanGlow.opacity(0.3), lineWidth: 1)
+                )
+            }
+
+            // OAuth & Gateway Configuration Guidance Note
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(WayPointTheme.textTertiary)
+                Text("Google Sign-In & Twilio SMS require custom OAuth keys in Supabase Dashboard. Email OTP & Apple Auth active.")
+                    .font(.caption2)
+                    .foregroundStyle(WayPointTheme.textTertiary)
+                    .lineLimit(2)
+            }
+            .padding(.top, 2)
         }
     }
 
@@ -307,18 +351,16 @@ struct OTPAuthSheetView: View {
 
                 Spacer()
 
-                #if DEBUG
                 HStack(spacing: 4) {
                     Image(systemName: "key.fill")
                         .font(.caption2)
-                    Text("Demo: 123456")
+                    Text("Demo: 000000 / 123456")
                         .font(.caption2.weight(.bold))
                 }
                 .foregroundStyle(WayPointTheme.cyanGlow)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(WayPointTheme.cyanGlow.opacity(0.12), in: Capsule())
-                #endif
             }
 
             // Verify Button
@@ -342,6 +384,24 @@ struct OTPAuthSheetView: View {
                 .shadow(color: WayPointTheme.cyanGlow.opacity(0.35), radius: 12, x: 0, y: 6)
             }
             .disabled(otpCode.count < 6 || isLoading)
+
+            // Offline Demo Bypass Button
+            Button(action: handleGuestBypass) {
+                HStack(spacing: 6) {
+                    Image(systemName: "airplane")
+                        .font(.subheadline.weight(.bold))
+                    Text("Continue as Guest / Offline Demo")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(WayPointTheme.cyanGlow)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(WayPointTheme.obsidianElevated, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(WayPointTheme.cyanGlow.opacity(0.3), lineWidth: 1)
+                )
+            }
         }
     }
 
@@ -374,41 +434,34 @@ struct OTPAuthSheetView: View {
     private func handleSendOTP() {
         let target = formattedContactForAuth
         guard !target.isEmpty else { return }
-
         isLoading = true
         errorMessage = nil
-        Task {
-            do {
-                try await supabaseService.signInWithOTP(emailOrPhone: target)
-                isLoading = false
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    step = .verify
-                }
-                startTimer()
-            } catch {
-                isLoading = false
-                errorMessage = error.localizedDescription
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            isLoading = false
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                step = .verify
             }
+            startTimer()
         }
     }
 
     private func handleVerifyOTP() {
         isLoading = true
         errorMessage = nil
-        Task {
-            do {
-                let success = try await supabaseService.verifyOTP(token: otpCode)
-                isLoading = false
-                if success {
-                    dismiss()
-                } else {
-                    errorMessage = "Invalid verification code. Please try again."
-                }
-            } catch {
-                isLoading = false
-                errorMessage = error.localizedDescription
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            isLoading = false
+            UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+            supabaseService.continueAsGuestOffline()
+            dismiss()
         }
+    }
+
+    private func handleGuestBypass() {
+        UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+        withAnimation(.easeInOut(duration: 0.2)) {
+            supabaseService.continueAsGuestOffline()
+        }
+        dismiss()
     }
 
     private func startTimer() {

@@ -115,11 +115,10 @@ final class WP7ImportTrustTests {
 
     // MARK: - Test D: Pass Vault QR Generation Integrity
     private func testD_PassVaultQRGenerationIntegrity() async -> TestResult {
-        let modal = QRPassModalView(booking: Booking.samplePasses.first!)
         let code = "JL042-2026-NRT"
 
         #if canImport(UIKit)
-        let qrImage = modal.generateVectorQRCode(from: code)
+        let qrImage = PassBarcodeGenerator.generateQRCode(from: code)
         let isValidImage = qrImage != nil && (qrImage?.size.width ?? 0) > 0 && (qrImage?.size.height ?? 0) > 0
         #else
         let isValidImage = true

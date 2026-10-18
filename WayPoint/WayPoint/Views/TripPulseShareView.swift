@@ -156,9 +156,9 @@ struct TripPulseCardView: View {
                         )
                         statTile(
                             emoji: "⚡",
-                            label: "PANIC PIVOTS",
+                            label: "REROUTE PLANS",
                             value: panicPivotsText,
-                            subtext: "AI Reroutes"
+                            subtext: "Smart Reroutes"
                         )
                     }
                 }
@@ -279,22 +279,17 @@ struct TripPulseCardView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
             } else {
-                AsyncImage(url: photoURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure, .empty:
-                        Rectangle()
-                            .fill(WayPointTheme.obsidianSurface)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundStyle(WayPointTheme.textTertiary)
-                            )
-                    @unknown default:
-                        EmptyView()
-                    }
+                OfflineCachedImage(url: photoURL, fallbackSystemName: "photo") { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(WayPointTheme.obsidianSurface)
+                        .overlay(
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        )
                 }
             }
 

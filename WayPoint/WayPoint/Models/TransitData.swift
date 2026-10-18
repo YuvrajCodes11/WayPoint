@@ -130,4 +130,42 @@ public struct TransitRegistry {
         TransitConnection(id: "c15", fromStationId: "tokyo", toStationId: "otemachi", travelTimeSeconds: 300, fareCostCents: 0, transitType: .walking, lineName: "Underground Pass", hexColor: "#777777", platformInfo: "Exit B1"),
         TransitConnection(id: "c16", fromStationId: "shibuya", toStationId: "roppongi", travelTimeSeconds: 600, fareCostCents: 220, transitType: .metro, lineName: "Roppongi Direct", hexColor: "#999999", platformInfo: "Bus Bay 3")
     ]
+
+    // MARK: - London Underground Dataset
+    public static let londonStations: [Station] = [
+        Station(id: "heathrow", name: "Heathrow Airport", coordinates: CGPoint(x: 0.10, y: 0.50), lines: ["Piccadilly Line"]),
+        Station(id: "kings-cross", name: "King's Cross", coordinates: CGPoint(x: 0.50, y: 0.15), lines: ["Piccadilly Line", "Northern Line"]),
+        Station(id: "covent-garden", name: "Covent Garden", coordinates: CGPoint(x: 0.45, y: 0.40), lines: ["Piccadilly Line"]),
+        Station(id: "piccadilly-circus", name: "Piccadilly Circus", coordinates: CGPoint(x: 0.35, y: 0.50), lines: ["Piccadilly Line"]),
+        Station(id: "westminster", name: "Westminster", coordinates: CGPoint(x: 0.40, y: 0.70), lines: ["Jubilee Line"]),
+        Station(id: "london-bridge", name: "London Bridge", coordinates: CGPoint(x: 0.75, y: 0.70), lines: ["Jubilee Line", "Northern Line"])
+    ]
+
+    public static let londonConnections: [TransitConnection] = [
+        // Piccadilly Line (Navy #0019A8)
+        TransitConnection(id: "lc1", fromStationId: "heathrow", toStationId: "piccadilly-circus", travelTimeSeconds: 2100, fareCostCents: 670, transitType: .express, lineName: "Piccadilly Line", hexColor: "#0019A8", platformInfo: "Platform 1"),
+        TransitConnection(id: "lc2", fromStationId: "piccadilly-circus", toStationId: "covent-garden", travelTimeSeconds: 180, fareCostCents: 280, transitType: .metro, lineName: "Piccadilly Line", hexColor: "#0019A8", platformInfo: "Platform 2"),
+        TransitConnection(id: "lc3", fromStationId: "covent-garden", toStationId: "kings-cross", travelTimeSeconds: 360, fareCostCents: 280, transitType: .metro, lineName: "Piccadilly Line", hexColor: "#0019A8", platformInfo: "Platform 2"),
+        
+        // Northern Line (Black #1D1D1B)
+        TransitConnection(id: "lc4", fromStationId: "kings-cross", toStationId: "london-bridge", travelTimeSeconds: 480, fareCostCents: 280, transitType: .metro, lineName: "Northern Line", hexColor: "#1D1D1B", platformInfo: "Southbound"),
+        
+        // Jubilee Line (Silver #868F98)
+        TransitConnection(id: "lc5", fromStationId: "westminster", toStationId: "london-bridge", travelTimeSeconds: 300, fareCostCents: 280, transitType: .metro, lineName: "Jubilee Line", hexColor: "#868F98", platformInfo: "Eastbound")
+    ]
+
+    // MARK: - Dynamic Resolver Methods
+    public static func stations(for destination: String?) -> [Station] {
+        if let dest = destination?.lowercased(), dest.contains("london") {
+            return londonStations
+        }
+        return defaultStations
+    }
+
+    public static func connections(for destination: String?) -> [TransitConnection] {
+        if let dest = destination?.lowercased(), dest.contains("london") {
+            return londonConnections
+        }
+        return defaultConnections
+    }
 }

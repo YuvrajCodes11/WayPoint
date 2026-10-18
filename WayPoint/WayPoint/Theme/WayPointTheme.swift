@@ -2,42 +2,77 @@
 //  WayPointTheme.swift
 //  WayPoint
 //
+//  Module 1: Native Apple HIG Design System & Standard System Hierarchy
+//
 
 import SwiftUI
 
-enum WayPointTheme {
-    static let obsidian = Color(red: 0.06, green: 0.07, blue: 0.10)
-    static let obsidianElevated = Color(red: 0.10, green: 0.11, blue: 0.15)
-    static let obsidianSurface = Color(red: 0.14, green: 0.15, blue: 0.20)
+public enum WayPointTheme {
+    // Native Apple iOS System Grouped Background Materials
+    public static let obsidian = Color(uiColor: .systemGroupedBackground)
+    public static let obsidianElevated = Color(uiColor: .secondarySystemGroupedBackground)
+    public static let obsidianSurface = Color(uiColor: .tertiarySystemGroupedBackground)
 
-    // Premium Apple Native Tokens
-    static let oledBackground = Color.black
-    static let cardSurface = Color(red: 0.08, green: 0.08, blue: 0.10)
-    static let hairlineStroke = Color.white.opacity(0.12)
+    // Standardized Apple Native Surface Tokens
+    public static let oledBackground = Color(uiColor: .systemBackground)
+    public static let cardSurface = Color(uiColor: .secondarySystemGroupedBackground)
+    public static let hairlineStroke = Color.primary.opacity(0.06)
 
-    static let emeraldRecovery = Color(red: 0.06, green: 0.73, blue: 0.51) // #10B981
-    static let crimsonAlert = Color(red: 0.94, green: 0.27, blue: 0.27)    // #EF4444
-    static let imperialGold = Color(red: 0.96, green: 0.62, blue: 0.04)    // #F59E0B
-    static let sapphireAccent = Color(red: 0.23, green: 0.51, blue: 0.96)  // #3B82F6
+    // iOS Standardized Semantic Status Colors
+    public static let emeraldRecovery = Color(uiColor: .systemGreen)
+    public static let crimsonAlert = Color(uiColor: .systemRed)
+    public static let imperialGold = Color(uiColor: .systemOrange)
+    public static let sapphireAccent = Color(uiColor: .systemBlue)
 
-    static let cyanGlow = Color(red: 0.20, green: 0.85, blue: 0.95)
-    static let violetGlow = Color(red: 0.62, green: 0.38, blue: 0.98)
-    static let accentGradient = LinearGradient(
-        colors: [cyanGlow, violetGlow],
+    // Clean Apple System Tints (Replacing Gratuitous Neon Glows)
+    public static let cyanGlow = Color(uiColor: .systemBlue)
+    public static let violetGlow = Color(uiColor: .systemIndigo)
+    public static let accentGradient = LinearGradient(
+        colors: [Color(uiColor: .systemBlue), Color(uiColor: .systemIndigo)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
-    static let textPrimary = Color.white
-    static let textSecondary = Color.white.opacity(0.62)
-    static let textTertiary = Color.white.opacity(0.38)
+    // San Francisco Semantic Text Hierarchy
+    public static let textPrimary = Color.primary
+    public static let textSecondary = Color.secondary
+    public static let textTertiary = Color(uiColor: .tertiaryLabel)
 
-    static let glassBorder = Color.white.opacity(0.14)
-    static let glassHighlight = Color.white.opacity(0.22)
-    static let glassShadow = Color.black.opacity(0.45)
+    // Standard Apple Spec Borders & Dividers
+    public static let glassBorder = Color.primary.opacity(0.06)
+    public static let glassHighlight = Color.primary.opacity(0.10)
+    public static let glassShadow = Color.black.opacity(0.08)
 
-    static let budgetHealthy = emeraldRecovery
-    static let budgetWarning = imperialGold
-    static let budgetOver = crimsonAlert
+    // Budget Engine Status Tints
+    public static let budgetHealthy = emeraldRecovery
+    public static let budgetWarning = imperialGold
+    public static let budgetOver = crimsonAlert
 }
 
+extension Color {
+    public init?(hex: String) {
+        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hexSanitized.hasPrefix("#") {
+            hexSanitized.removeFirst()
+        }
+        
+        var rgb: UInt64 = 0
+        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
+        
+        let length = hexSanitized.count
+        if length == 6 {
+            let r = Double((rgb & 0xFF0000) >> 16) / 255.0
+            let g = Double((rgb & 0x00FF00) >> 8) / 255.0
+            let b = Double(rgb & 0x0000FF) / 255.0
+            self.init(red: r, green: g, blue: b)
+        } else if length == 8 {
+            let r = Double((rgb & 0xFF000000) >> 24) / 255.0
+            let g = Double((rgb & 0x00FF0000) >> 16) / 255.0
+            let b = Double((rgb & 0x0000FF00) >> 8) / 255.0
+            let a = Double(rgb & 0x000000FF) / 255.0
+            self.init(red: r, green: g, blue: b, opacity: a)
+        } else {
+            return nil
+        }
+    }
+}
